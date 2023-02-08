@@ -373,7 +373,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           && !Array.isArray(options.modernPolyfills)
         ) {
           // analyze and record modern polyfills
-          await detectPolyfills(raw, { esmodules: true }, modernPolyfills)
+          await detectPolyfills(raw, 'supports es6-module', modernPolyfills)
         }
 
         const ms = new MagicString(raw)
