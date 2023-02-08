@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 import path from 'path'
 import type {
   EnvConfig,
+  JsMinifyOptions,
   Options as SwcOptions,
   Plugin as SwcPlugin,
   Statement,
@@ -276,8 +277,6 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           imports: legacyPolyfills,
           bundle,
           facadeToChunkMap: facadeToLegacyPolyfillMap,
-          // force using terser for legacy polyfill minification, since esbuild
-          // isn't legacy-safe
           buildOptions: resolvedConfig.build,
           format: 'iife',
           rollupOutputOptions: opts,
@@ -415,11 +414,6 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       // legacy-unsafe code - e.g. rewriting object properties into shorthands
       opts.__vite_skip_esbuild__ = true
 
-      // @ts-expect-error force terser for legacy chunks. This only takes effect if
-      // minification isn't disabled, because that leaves out the terser plugin
-      // entirely.
-      opts.__vite_force_terser__ = true
-
       // @ts-expect-error In the `generateBundle` hook,
       // we'll delete the assets from the legacy bundle to avoid emitting duplicate assets.
       // But that's still a waste of computing resource.
@@ -448,6 +442,20 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
               },
             },
           },
+          minify: {
+            compress: {
+              // Different defaults between terser and swc
+              dead_code: true,
+              keep_fargs: true,
+              passes: 1,
+            },
+            mangle: true,
+            safari10: true,
+            ...resolvedConfig.build.terserOptions as JsMinifyOptions,
+            sourceMap: Boolean(opts.sourcemap),
+            module: opts.format.startsWith('es'),
+            toplevel: opts.format === 'cjs',
+          },
         },
       }
       const transformResult = await swc.transform(raw, {
@@ -462,6 +470,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       const result = await swc.print(plugin(ast), {
         ...swcOptions,
         inputSourceMap: transformResult.map,
+        minify: Boolean(resolvedConfig.build.minify),
       })
 
       return result
@@ -675,8 +684,7 @@ async function buildPolyfillChunk({
   rollupOutputOptions: NormalizedOutputOptions,
   excludeSystemJS?: boolean,
 }) {
-  let { minify, assetsDir } = buildOptions
-  minify = minify ? 'terser' : false
+  let { assetsDir } = buildOptions
   const res = await build({
     mode,
     // so that everything is resolved from here
@@ -686,7 +694,7 @@ async function buildPolyfillChunk({
     plugins: [polyfillsPlugin(imports, excludeSystemJS)],
     build: {
       write: false,
-      minify,
+      minify: false,
       assetsDir,
       rollupOptions: {
         input: {

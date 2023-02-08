@@ -35,12 +35,6 @@ export default {
 }
 ```
 
-Terser must be installed because plugin-legacy uses Terser for minification.
-
-```sh
-npm add -D terser
-```
-
 ## Options
 
 ### `targets`
