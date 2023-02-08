@@ -1,5 +1,12 @@
 
 
+## [0.2.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.1.2...v0.2.0) (2023-02-08)
+
+
+### Features
+
+* minify with swc instead of terser ([72c3791](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/72c3791fa4d05e189e660842d8ab0f3898766231))
+
 ### [0.1.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.1.1...v0.1.2) (2023-02-08)
 
 
