@@ -6,6 +6,8 @@ This package is intended to replace [`@vitejs/plugin-legacy`](https://www.npmjs.
 
 **WARNING: This package is not yet stable. Please take special care before using it in a production environment.**
 
+---
+
 Vite's default browser support baseline is [Native ESM](https://caniuse.com/es6-module), [native ESM dynamic import](https://caniuse.com/es6-module-dynamic-import), and [`import.meta`](https://caniuse.com/mdn-javascript_operators_import_meta). This plugin provides support for legacy browsers that do not support those features when building for production.
 
 By default, this plugin will:
