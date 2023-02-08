@@ -634,7 +634,7 @@ function createSwcEnvOptions(
     loose: false,
     mode: needPolyfills ? 'usage' : undefined,
     coreJs: needPolyfills
-      ? require('core-js/package.json')
+      ? require('core-js/package.json').version
       : undefined,
     shippedProposals: true,
   }
