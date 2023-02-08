@@ -440,7 +440,10 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         env: createSwcEnvOptions(targets, {
           needPolyfills,
         }),
-        plugin: transformChunkPlugin(legacyPolyfills),
+        plugin: swc.plugins([
+          recordAndRemovePolyfillSwcPlugin(legacyPolyfills),
+          wrapIIFESwcPlugin(),
+        ]),
         jsc: {
           transform: {
             optimizer: {
@@ -759,8 +762,10 @@ function isLegacyBundle(
   return false
 }
 
-function transformChunkPlugin(polyfills: Set<string>): SwcPlugin {
-  return (program) => {
+function recordAndRemovePolyfillSwcPlugin(
+  polyfills: Set<string>,
+): SwcPlugin {
+  return program => {
     program.body = program.body.filter((node) => {
       if (node.type === 'ImportDeclaration') {
         polyfills.add(node.source.value)
@@ -790,7 +795,12 @@ function transformChunkPlugin(polyfills: Set<string>): SwcPlugin {
 
       return true
     })
+    return program
+  }
+}
 
+function wrapIIFESwcPlugin(): SwcPlugin {
+  return program => {
     program.body = [
       {
         type: 'ExpressionStatement',
@@ -819,7 +829,6 @@ function transformChunkPlugin(polyfills: Set<string>): SwcPlugin {
         },
       },
     ]
-
     return program
   }
 }
