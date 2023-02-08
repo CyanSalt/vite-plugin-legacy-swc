@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 import path from 'path'
 import type {
   EnvConfig,
+  Options as SwcOptions,
   Plugin as SwcPlugin,
   Statement,
 } from '@swc/core'
@@ -432,18 +433,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       // transform the legacy chunk with @swc/core
       const sourceMaps = Boolean(resolvedConfig.build.sourcemap)
       const swc = await loadSwc()
-      const result = await swc.transform(raw, {
+      const swcOptions: SwcOptions = {
         swcrc: false,
         configFile: false,
         sourceMaps,
-        inputSourceMap: undefined, // sourceMaps ? chunk.map : undefined, `.map` TODO: moved to OutputChunk?
         env: createSwcEnvOptions(targets, {
           needPolyfills,
         }),
-        plugin: swc.plugins([
-          recordAndRemovePolyfillSwcPlugin(legacyPolyfills),
-          wrapIIFESwcPlugin(),
-        ]),
         jsc: {
           transform: {
             optimizer: {
@@ -453,6 +449,19 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
             },
           },
         },
+      }
+      const transformResult = await swc.transform(raw, {
+        ...swcOptions,
+        inputSourceMap: undefined, // sourceMaps ? chunk.map : undefined, `.map` TODO: moved to OutputChunk?
+      })
+      const plugin = swc.plugins([
+        recordAndRemovePolyfillSwcPlugin(legacyPolyfills),
+        wrapIIFESwcPlugin(),
+      ])
+      const ast = await swc.parse(transformResult.code)
+      const result = await swc.print(plugin(ast), {
+        ...swcOptions,
+        inputSourceMap: transformResult.map,
       })
 
       return result
@@ -609,25 +618,23 @@ export async function detectPolyfills(
   list: Set<string>,
 ): Promise<void> {
   const swc = await loadSwc()
-  await swc.transform(code, {
+  const result = await swc.transform(code, {
     swcrc: false,
     configFile: false,
     env: createSwcEnvOptions(targets),
-    plugin(program) {
-      for (const node of program.body) {
-        if (node.type === 'ImportDeclaration') {
-          const source = node.source.value
-          if (
-            source.startsWith('core-js/')
-            || source.startsWith('regenerator-runtime/')
-          ) {
-            list.add(source)
-          }
-        }
-      }
-      return program
-    },
   })
+  const ast = await swc.parse(result.code)
+  for (const node of ast.body) {
+    if (node.type === 'ImportDeclaration') {
+      const source = node.source.value
+      if (
+        source.startsWith('core-js/')
+        || source.startsWith('regenerator-runtime/')
+      ) {
+        list.add(source)
+      }
+    }
+  }
 }
 
 function createSwcEnvOptions(
@@ -805,27 +812,27 @@ function wrapIIFESwcPlugin(): SwcPlugin {
       {
         type: 'ExpressionStatement',
         span: { start: 0, end: 0, ctxt: 0 },
-
         expression: {
           type: 'CallExpression',
           span: { start: 0, end: 0, ctxt: 0 },
-
-          arguments: [],
           callee: {
-            type: 'FunctionExpression',
+            type: 'ParenthesisExpression',
             span: { start: 0, end: 0, ctxt: 0 },
-
-            params: [],
-
-            async: false,
-            generator: false,
-
-            body: {
-              stmts: program.body as Statement[],
-              type: 'BlockStatement',
+            expression: {
+              type: 'FunctionExpression',
+              params: [],
+              decorators: [],
               span: { start: 0, end: 0, ctxt: 0 },
+              body: {
+                type: 'BlockStatement',
+                span: { start: 0, end: 0, ctxt: 0 },
+                stmts: program.body as Statement[],
+              },
+              generator: false,
+              async: false,
             },
           },
+          arguments: [],
         },
       },
     ]

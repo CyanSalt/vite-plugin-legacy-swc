@@ -4,8 +4,6 @@ Provides legacy browsers support for the production build with [SWC](https://git
 
 This package is intended to replace [`@vitejs/plugin-legacy`](https://www.npmjs.com/package/@vitejs/plugin-legacy) in performance-sensitive situations. It is basically an implementation of [vitejs/vite#4105](https://github.com/vitejs/vite/pull/4105).
 
-Also, for [an uncontrollable reason](https://github.com/swc-project/swc/issues/6255) this plugin does not support `@swc/core>=1.3.7` at the moment, so its dependencies are fixed to `1.3.6`.
-
 **WARNING: This package is not yet stable. Please take special care before using it in a production environment.**
 
 ---
