@@ -1,5 +1,14 @@
 
 
+### [0.1.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.1.1...v0.1.2) (2023-02-08)
+
+
+### Bug Fixes
+
+* apply swc plugins after transforming ([2e4e138](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/2e4e13851f1ceb3672125c09502750988fe30033))
+* browserslist-rs compat ([d8aff61](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/d8aff618cf162f5b95562a1169b748fad14a6470))
+* missing deps ([a600f7c](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/a600f7c3f1b7e8711d330d32cab55bff8d9d2c01))
+
 ### [0.1.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.1.0...v0.1.1) (2023-02-08)
 
 
