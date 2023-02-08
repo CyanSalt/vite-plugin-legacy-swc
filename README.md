@@ -71,6 +71,18 @@ npm add -D terser
 
   Note: if additional polyfills are needed for both the modern and legacy chunks, they can simply be imported in the application source code.
 
+### `ignoreBrowserslistConfig`
+
+- **Type:** `boolean`
+- **Default:** `false`
+
+  The legacy plugin automatically detects [`browserslist` config sources](https://github.com/browserslist/browserslist#browserslist-):
+
+  - `browserslist` field in `package.json`
+  - `.browserslistrc` file in cwd.
+
+  Set to `false` to ignore these sources.
+
 ### `modernPolyfills`
 
 - **Type:** `boolean | string[]`

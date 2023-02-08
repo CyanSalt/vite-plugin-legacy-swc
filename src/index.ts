@@ -304,7 +304,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       targets
         = options.targets
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        || browserslistLoadConfig({ path: resolvedConfig.root })
+        || (
+          options.ignoreBrowserslistConfig
+            ? undefined
+            : browserslistLoadConfig({ path: resolvedConfig.root })
+        )
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         || 'last 2 versions and not dead, > 0.3%, Firefox ESR'
       if (isDebug) {

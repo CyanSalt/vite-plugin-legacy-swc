@@ -4,6 +4,10 @@ export interface Options {
    */
   targets?: string | string[] | Record<string, string>,
   /**
+   * default: false
+   */
+  ignoreBrowserslistConfig?: boolean,
+  /**
    * default: true
    */
   polyfills?: boolean | string[],
