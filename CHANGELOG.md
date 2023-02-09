@@ -1,5 +1,12 @@
 
 
+### [0.2.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.0...v0.2.1) (2023-02-09)
+
+
+### Bug Fixes
+
+* export options type ([5908dbf](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/5908dbf7988d105c78d34b34e1fabb74bf2b6070))
+
 ## [0.2.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.1.2...v0.2.0) (2023-02-08)
 
 
