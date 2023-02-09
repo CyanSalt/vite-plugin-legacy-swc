@@ -1,5 +1,12 @@
 
 
+### [0.2.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.1...v0.2.2) (2023-02-09)
+
+
+### Bug Fixes
+
+* remove terser as peer deps ([ca0bd7d](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/ca0bd7dbd9e0851de9d81206989eac3830478e77))
+
 ### [0.2.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.0...v0.2.1) (2023-02-09)
 
 
