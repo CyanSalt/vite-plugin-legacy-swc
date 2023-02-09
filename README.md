@@ -4,6 +4,18 @@ Provides legacy browsers support for the production build with [SWC](https://git
 
 This package is intended to replace [`@vitejs/plugin-legacy`](https://www.npmjs.com/package/@vitejs/plugin-legacy) in performance-sensitive situations. It is basically an implementation of [vitejs/vite#4105](https://github.com/vitejs/vite/pull/4105).
 
+As for performance, for reference, the results of my tests on a huge private project (with `{ modernPolyfills: true }`) are as follows:
+
+| | Without legacy browsers support | With `@vitejs/plugin-legacy` | With `vite-plugin-legacy-swc` |
+| --- | --- | --- | --- |
+| CPU Time | 119.43s | 407.01s | 232.26s |
+| Asset Size* | 31M | 41M | 43M |
+| Asset Size Without Legacy Chunks | 31M | 31M | 32M |
+
+Compared to `@vitejs/plugin-legacy`, `vite-plugin-legacy-swc` **saves 43% of time and increases asset size by only 3% ~ 5%**.
+
+*\* In my current tests, `@vitejs/plugin-legacy` does not generate source maps for legacy chunks correctly, so the asset size statistics exclude the source maps.*
+
 **WARNING: This package is not yet stable. Please take special care before using it in a production environment.**
 
 ---
