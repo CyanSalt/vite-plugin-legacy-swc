@@ -1,5 +1,12 @@
 
 
+### [0.2.3](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.2...v0.2.3) (2023-02-15)
+
+
+### Bug Fixes
+
+* disable minification if minify is false ([c7bca76](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/c7bca76adf04ca64fe5908952aea84179b3bf660))
+
 ### [0.2.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.1...v0.2.2) (2023-02-09)
 
 
