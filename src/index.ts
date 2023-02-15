@@ -434,6 +434,10 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         env: createSwcEnvOptions(targets, {
           needPolyfills,
         }),
+      }
+      const transformResult = await swc.transform(raw, {
+        ...swcOptions,
+        inputSourceMap: undefined, // sourceMaps ? chunk.map : undefined, `.map` TODO: moved to OutputChunk?
         jsc: {
           transform: {
             optimizer: {
@@ -442,6 +446,18 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
               },
             },
           },
+        },
+      })
+      const plugin = swc.plugins([
+        recordAndRemovePolyfillSwcPlugin(legacyPolyfills),
+        wrapIIFESwcPlugin(),
+      ])
+      const ast = await swc.parse(transformResult.code)
+      const result = await swc.print(plugin(ast), {
+        ...swcOptions,
+        inputSourceMap: transformResult.map,
+        minify: Boolean(resolvedConfig.build.minify),
+        jsc: {
           minify: {
             compress: {
               // Different defaults between terser and swc
@@ -457,20 +473,6 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
             toplevel: opts.format === 'cjs',
           },
         },
-      }
-      const transformResult = await swc.transform(raw, {
-        ...swcOptions,
-        inputSourceMap: undefined, // sourceMaps ? chunk.map : undefined, `.map` TODO: moved to OutputChunk?
-      })
-      const plugin = swc.plugins([
-        recordAndRemovePolyfillSwcPlugin(legacyPolyfills),
-        wrapIIFESwcPlugin(),
-      ])
-      const ast = await swc.parse(transformResult.code)
-      const result = await swc.print(plugin(ast), {
-        ...swcOptions,
-        inputSourceMap: transformResult.map,
-        minify: Boolean(resolvedConfig.build.minify),
       })
 
       return result
