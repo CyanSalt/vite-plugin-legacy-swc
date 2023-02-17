@@ -5,7 +5,7 @@
     "declaration": true,
     "rootDir": "src",
     "outDir": "dist",
-    "module": "CommonJS"
+    "module": "ES2020"
   },
   "include": [
     "src"

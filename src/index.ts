@@ -1,5 +1,7 @@
 import { createHash } from 'crypto'
+import { createRequire } from 'module'
 import path from 'path'
+import url from 'url'
 import type {
   EnvConfig,
   JsMinifyOptions,
@@ -34,6 +36,8 @@ import {
   systemJSInlineCode,
 } from './snippets'
 import type { Options } from './types'
+
+const $require = createRequire(import.meta.url)
 
 // lazy load swc since it's not used during dev
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -659,7 +663,7 @@ function createSwcEnvOptions(
     loose: false,
     mode: needPolyfills ? 'usage' : undefined,
     coreJs: needPolyfills
-      ? require('core-js/package.json').version
+      ? $require('core-js/package.json').version
       : undefined,
     shippedProposals: true,
   }
@@ -690,7 +694,7 @@ async function buildPolyfillChunk({
   const res = await build({
     mode,
     // so that everything is resolved from here
-    root: path.dirname(__filename),
+    root: path.dirname(url.fileURLToPath(import.meta.url)),
     configFile: false,
     logLevel: 'error',
     plugins: [polyfillsPlugin(imports, excludeSystemJS)],
