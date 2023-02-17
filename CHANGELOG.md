@@ -1,5 +1,12 @@
 
 
+## [0.3.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.3...v0.3.0) (2023-02-17)
+
+
+### Features
+
+* support native esm ([05732ef](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/05732ef8e41d0dc70b0c87efb703304c7bf31462))
+
 ### [0.2.3](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.2...v0.2.3) (2023-02-15)
 
 
