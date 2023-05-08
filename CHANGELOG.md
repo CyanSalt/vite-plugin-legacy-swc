@@ -1,5 +1,13 @@
 
 
+### [0.3.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.3.0...v0.3.1) (2023-05-08)
+
+
+### Bug Fixes
+
+* minify polyfill chunks ([7e5e74d](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/7e5e74dc3c32cd8fcda266d8098cf80d3c5ee3ec))
+* severity vulnerability ([08420af](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/08420af503d06a2eda0f450ad89143b2dda8e5dd))
+
 ## [0.3.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.2.3...v0.3.0) (2023-02-17)
 
 
