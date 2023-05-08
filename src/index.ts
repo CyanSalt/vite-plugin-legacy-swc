@@ -439,10 +439,30 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           needPolyfills,
         }),
       }
+      const minifyOptions: JsMinifyOptions = {
+        compress: {
+          // Different defaults between terser and swc
+          dead_code: true,
+          keep_fargs: true,
+          passes: 1,
+        },
+        mangle: true,
+        safari10: true,
+        ...resolvedConfig.build.terserOptions as JsMinifyOptions,
+        sourceMap: Boolean(opts.sourcemap),
+        module: opts.format.startsWith('es'),
+        toplevel: opts.format === 'cjs',
+      }
       const transformResult = await swc.transform(raw, {
         ...swcOptions,
         inputSourceMap: undefined, // sourceMaps ? chunk.map : undefined, `.map` TODO: moved to OutputChunk?
+        minify: Boolean(resolvedConfig.build.minify && minifyOptions.mangle),
         jsc: {
+          // mangle only
+          minify: {
+            ...minifyOptions,
+            compress: false,
+          },
           transform: {
             optimizer: {
               globals: {
@@ -460,21 +480,12 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       const result = await swc.print(plugin(ast), {
         ...swcOptions,
         inputSourceMap: transformResult.map,
-        minify: Boolean(resolvedConfig.build.minify),
+        minify: Boolean(resolvedConfig.build.minify && minifyOptions.compress),
         jsc: {
+          // compress only
           minify: {
-            compress: {
-              // Different defaults between terser and swc
-              dead_code: true,
-              keep_fargs: true,
-              passes: 1,
-            },
-            mangle: true,
-            safari10: true,
-            ...resolvedConfig.build.terserOptions as JsMinifyOptions,
-            sourceMap: Boolean(opts.sourcemap),
-            module: opts.format.startsWith('es'),
-            toplevel: opts.format === 'cjs',
+            ...minifyOptions,
+            mangle: false,
           },
         },
       })
@@ -690,7 +701,7 @@ async function buildPolyfillChunk({
   rollupOutputOptions: NormalizedOutputOptions,
   excludeSystemJS?: boolean,
 }) {
-  let { assetsDir } = buildOptions
+  let { minify, assetsDir, terserOptions, sourcemap } = buildOptions
   const res = await build({
     mode,
     // so that everything is resolved from here
@@ -728,6 +739,35 @@ async function buildPolyfillChunk({
   const rollupOutput = Array.isArray(res) ? res[0] : res
   if (!('output' in rollupOutput)) return
   const polyfillChunk = rollupOutput.output[0]
+
+  if (minify) {
+    const swc = await loadSwc()
+    const sourceMaps = Boolean(sourcemap)
+    const minifyOptions: JsMinifyOptions = {
+      compress: {
+        // Different defaults between terser and swc
+        dead_code: true,
+        keep_fargs: true,
+        passes: 1,
+      },
+      mangle: true,
+      safari10: true,
+      ...terserOptions as JsMinifyOptions,
+      sourceMap: sourceMaps,
+    }
+    const minifyResult = await swc.transform(polyfillChunk.code, {
+      swcrc: false,
+      configFile: false,
+      sourceMaps,
+      inputSourceMap: polyfillChunk.map ? polyfillChunk.map.toString() : undefined,
+      minify: true,
+      jsc: {
+        // mangle only
+        minify: minifyOptions,
+      },
+    })
+    Object.assign(polyfillChunk, minifyResult)
+  }
 
   // associate the polyfill chunk to every entry chunk so that we can retrieve
   // the polyfill filename in index html transform

@@ -8,11 +8,11 @@ As for performance, for reference, the results of my tests on a huge private pro
 
 | | Without legacy browsers support | With `@vitejs/plugin-legacy` | With `vite-plugin-legacy-swc` |
 | --- | --- | --- | --- |
-| CPU Time | 119.43s | 407.01s | 232.26s |
-| Asset Size* | 31M | 41M | 43M |
-| Asset Size Without Legacy Chunks | 31M | 31M | 32M |
+| CPU Time | 146.45s | 697.82s | 295.04s |
+| JS Asset Size* | 9.5M | 22M | 21M |
+| JS Asset Size Without Legacy Chunks | 9.5M | 9.6M | 9.6M |
 
-Compared to `@vitejs/plugin-legacy`, `vite-plugin-legacy-swc` **saves 43% of time and increases asset size by only 3% ~ 5%**.
+Compared to `@vitejs/plugin-legacy`, `vite-plugin-legacy-swc` **saves 58% of time and 4% of JS asset size**.
 
 *\* In my current tests, `@vitejs/plugin-legacy` does not generate source maps for legacy chunks correctly, so the asset size statistics exclude the source maps.*
 
