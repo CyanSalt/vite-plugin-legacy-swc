@@ -1,5 +1,7 @@
 # vite-plugin-legacy-swc
 
+[![npm](https://img.shields.io/npm/v/vite-plugin-legacy-swc.svg)](https://www.npmjs.com/package/vite-plugin-legacy-swc)
+
 Provides legacy browsers support for the production build with [SWC](https://github.com/swc-project/swc).
 
 This package is intended to replace [`@vitejs/plugin-legacy`](https://www.npmjs.com/package/@vitejs/plugin-legacy) in performance-sensitive situations. It is basically an implementation of [vitejs/vite#4105](https://github.com/vitejs/vite/pull/4105).
