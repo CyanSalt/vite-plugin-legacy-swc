@@ -1,5 +1,12 @@
 
 
+## [0.4.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.3.1...v0.4.0) (2023-09-10)
+
+
+### Features
+
+* add option to output only legacy builds ([1b346d5](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/1b346d54ad69cee298dde76be7241038cb94594e))
+
 ### [0.3.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.3.0...v0.3.1) (2023-05-08)
 
 
