@@ -18,7 +18,8 @@ Compared to `@vitejs/plugin-legacy`, `vite-plugin-legacy-swc` **saves 58% of tim
 
 *\* In my current tests, `@vitejs/plugin-legacy` does not generate source maps for legacy chunks correctly, so the asset size statistics exclude the source maps.*
 
-**WARNING: This package is not yet stable. Please take special care before using it in a production environment.**
+> [!WARNING]
+> This package is not yet stable. Please take special care before using it in a production environment.
 
 ---
 
