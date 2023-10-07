@@ -1,5 +1,12 @@
 
 
+### [0.4.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.4.1...v0.4.2) (2023-10-07)
+
+
+### Bug Fixes
+
+* broken build when renderModernChunks=false & polyfills=false ([f32154f](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/f32154f317e3157a0f0e92f336679c586345ce99))
+
 ### [0.4.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.4.0...v0.4.1) (2023-09-20)
 
 
