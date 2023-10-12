@@ -41,23 +41,23 @@
   },
   "homepage": "https://github.com/CyanSalt/vite-plugin-legacy-swc#readme",
   "dependencies": {
-    "@swc/core": "^1.3.34",
+    "@swc/core": "^1.3.92",
     "browserslist": "^4.21.5",
-    "core-js": "^3.27.2",
-    "magic-string": "^0.27.0",
-    "regenerator-runtime": "^0.13.11",
-    "systemjs": "^6.13.0"
+    "core-js": "^3.33.0",
+    "magic-string": "^0.30.4",
+    "regenerator-runtime": "^0.14.0",
+    "systemjs": "^6.14.2"
   },
   "devDependencies": {
-    "@cyansalt/eslint-config-preset": "^1.12.1",
-    "@cyansalt/tsconfig": "^2.1.1",
-    "@release-it/conventional-changelog": "^5.1.1",
-    "@types/node": "^18.13.0",
-    "release-it": "^15.6.0",
-    "typescript": "^4.9.5",
-    "unbuild": "^1.1.2",
-    "vite": "^4.1.1",
-    "vitest": "^0.28.4"
+    "@cyansalt/eslint-config-preset": "^1.15.0",
+    "@cyansalt/tsconfig": "^2.2.1",
+    "@release-it/conventional-changelog": "^7.0.2",
+    "@types/node": "^18.18.4",
+    "release-it": "^16.2.1",
+    "typescript": "^5.2.2",
+    "unbuild": "^2.0.0",
+    "vite": "^4.4.11",
+    "vitest": "^0.34.6"
   },
   "peerDependencies": {
     "vite": ">=4.0.0"

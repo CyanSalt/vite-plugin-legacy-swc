@@ -5,9 +5,9 @@ import url from 'url'
 import type {
   EnvConfig,
   JsMinifyOptions,
+  Statement,
   Options as SwcOptions,
   Plugin as SwcPlugin,
-  Statement,
 } from '@swc/core'
 import browserslist from 'browserslist'
 import MagicString from 'magic-string'
@@ -36,8 +36,6 @@ import {
   systemJSInlineCode,
 } from './snippets'
 import type { Options } from './types'
-
-const $require = createRequire(import.meta.url)
 
 // lazy load swc since it's not used during dev
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -129,9 +127,25 @@ function toAssetPathFromHtml(
 
 const legacyEnvVarMarker = `__VITE_IS_LEGACY__`
 
+const $require = createRequire(import.meta.url)
+
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let resolvedConfig: ResolvedConfig
   let targets: Options['targets']
+
+  // browsers supporting ESM + dynamic import + import.meta + async generator
+  const modernTargetsEsbuild = [
+    'es2020',
+    'edge79',
+    'firefox67',
+    'chrome64',
+    'safari12',
+  ]
+  // same with above but by browserslist syntax
+  // es2020 = chrome 80+, safari 13.1+, firefox 72+, edge 80+
+  // https://github.com/evanw/esbuild/issues/121#issuecomment-646956379
+  const modernTargetsSwc
+    = 'edge>=80, firefox>=72, chrome>=80, safari>=13.1, chromeAndroid>=80, iOS>=13.1'
 
   const genLegacy = options.renderLegacyChunks !== false
   const genModern = options.renderModernChunks !== false
@@ -180,7 +194,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     name: 'vite:legacy-config',
 
     config(config, env) {
-      if (env.command === 'build') {
+      if (env.command === 'build' && !config.build?.ssr) {
         if (!config.build) {
           config.build = {}
         }
@@ -198,14 +212,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           // Vite's default target browsers are **not** the same.
           // See https://github.com/vitejs/vite/pull/10052#issuecomment-1242076461
           overriddenBuildTarget = config.build.target !== undefined
-          // browsers supporting ESM + dynamic import + import.meta + async generator
-          config.build.target = [
-            'es2020',
-            'edge79',
-            'firefox67',
-            'chrome64',
-            'safari12',
-          ]
+          config.build.target = modernTargetsEsbuild
         }
       }
 
@@ -248,7 +255,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
             modernPolyfills,
           )
         }
-        await buildPolyfillChunk({
+        const polyfillChunk = await buildPolyfillChunk({
           mode: resolvedConfig.mode,
           imports: modernPolyfills,
           bundle,
@@ -258,6 +265,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           rollupOutputOptions: opts,
           excludeSystemJS: true,
         })
+        if (genLegacy && polyfillChunk) {
+          polyfillChunk.code = modernChunkLegacyGuard + polyfillChunk.code
+        }
         return
       }
 
@@ -289,6 +299,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           imports: legacyPolyfills,
           bundle,
           facadeToChunkMap: facadeToLegacyPolyfillMap,
+          // force using swc for legacy polyfill minification, since esbuild
+          // isn't legacy-safe
           buildOptions: resolvedConfig.build,
           format: 'iife',
           rollupOutputOptions: opts,
@@ -315,13 +327,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
       targets
         = options.targets
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        || (
-          options.ignoreBrowserslistConfig
-            ? undefined
-            : browserslistLoadConfig({ path: resolvedConfig.root })
-        )
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        || browserslistLoadConfig({ path: resolvedConfig.root })
         || 'last 2 versions and not dead, > 0.3%, Firefox ESR'
       if (isDebug) {
         console.log(`[vite-plugin-legacy-swc] targets:`, targets)
@@ -345,6 +351,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           if (fileName.includes('[name]')) {
             // [name]-[hash].[format] -> [name]-legacy-[hash].[format]
             fileName = fileName.replace('[name]', '[name]-legacy')
+          } else if (fileName.includes('[hash]')) {
+            // custom[hash].[format] -> [name]-legacy[hash].[format]
+            // custom-[hash].[format] -> [name]-legacy-[hash].[format]
+            // custom.[hash].[format] -> [name]-legacy.[hash].[format]
+            fileName = fileName.replace(/[.-]?\[hash\]/, '-legacy$&')
           } else {
             // entry.js -> entry-legacy.js
             fileName = fileName.replace(/(.+)\.(.+)/, '$1-legacy.$2')
@@ -355,13 +366,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       }
 
       const createLegacyOutput = (
-        output: OutputOptions = {},
+        outputOptions: OutputOptions = {},
       ): OutputOptions => {
         return {
-          ...output,
+          ...outputOptions,
           format: 'system',
-          entryFileNames: getLegacyOutputFileName(output.entryFileNames),
-          chunkFileNames: getLegacyOutputFileName(output.chunkFileNames),
+          entryFileNames: getLegacyOutputFileName(outputOptions.entryFileNames),
+          chunkFileNames: getLegacyOutputFileName(outputOptions.chunkFileNames),
         }
       }
 
@@ -375,7 +386,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       } else {
         rollupOptions.output = [
           createLegacyOutput(output),
-          ...(genModern ? [output || {}] : []),
+          ...(genModern ? [output ?? {}] : []),
         ]
       }
     },
@@ -388,11 +399,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       if (!isLegacyChunk(chunk, opts)) {
         if (
           options.modernPolyfills
-          && !Array.isArray(options.modernPolyfills) &&
-          genModern
+          && !Array.isArray(options.modernPolyfills)
+          && genModern
         ) {
           // analyze and record modern polyfills
-          await detectPolyfills(raw, 'supports es6-module', modernPolyfills)
+          await detectPolyfills(raw, modernTargetsSwc, modernPolyfills)
         }
 
         const ms = new MagicString(raw)
@@ -417,7 +428,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         if (resolvedConfig.build.sourcemap) {
           return {
             code: ms.toString(),
-            map: ms.generateMap({ hires: true }),
+            map: ms.generateMap({ hires: 'boundary' }),
           }
         }
         return {
@@ -432,6 +443,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       // @ts-expect-error avoid esbuild transform on legacy chunks since it produces
       // legacy-unsafe code - e.g. rewriting object properties into shorthands
       opts.__vite_skip_esbuild__ = true
+
+      // @ts-expect-error force terser for legacy chunks. This only takes effect if
+      // minification isn't disabled, because that leaves out the terser plugin
+      // entirely.
+      opts.__vite_force_terser__ = true
 
       // @ts-expect-error In the `generateBundle` hook,
       // we'll delete the assets from the legacy bundle to avoid emitting duplicate assets.
@@ -560,7 +576,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       if (genModern) {
         tags.push({
           tag: 'script',
-          attrs: { nomodule: true },
+          attrs: { nomodule: genModern },
           children: safari10NoModuleFix,
           injectTo: 'body',
         })
@@ -689,9 +705,7 @@ export async function detectPolyfills(
 
 function createSwcEnvOptions(
   targets: any,
-  {
-    needPolyfills = true,
-  }: { needPolyfills?: boolean } = {},
+  { needPolyfills = true }: { needPolyfills?: boolean } = {},
 ): EnvConfig {
   return {
     targets,
@@ -804,6 +818,8 @@ async function buildPolyfillChunk({
 
   // add the chunk to the bundle
   bundle[polyfillChunk.fileName] = polyfillChunk
+
+  return polyfillChunk
 }
 
 function polyfillsPlugin(
