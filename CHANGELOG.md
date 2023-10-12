@@ -1,5 +1,12 @@
 
 
+## [0.5.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.4.2...v0.5.0) (2023-10-12)
+
+
+### Features
+
+* sync implementations from @vitejs/plugin-legacy ([879d384](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/879d384f896a98b4e0f834f3f9fc3a636d42f472))
+
 ### [0.4.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.4.1...v0.4.2) (2023-10-07)
 
 
