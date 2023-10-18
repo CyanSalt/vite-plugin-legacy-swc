@@ -144,8 +144,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   // same with above but by browserslist syntax
   // es2020 = chrome 80+, safari 13.1+, firefox 72+, edge 80+
   // https://github.com/evanw/esbuild/issues/121#issuecomment-646956379
+  // const modernTargetsSwc
+  //   = 'edge>=80, firefox>=72, chrome>=80, safari>=13.1, chromeAndroid>=80, iOS>=13.1'
+  // However, since esbuild only transform syntax rather than polyfill
+  // the output is not guaranteed to support es2020
+  // so this feature cannot be used as a basis for compatibility
   const modernTargetsSwc
-    = 'edge>=80, firefox>=72, chrome>=80, safari>=13.1, chromeAndroid>=80, iOS>=13.1'
+    = 'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'
 
   const genLegacy = options.renderLegacyChunks !== false
   const genModern = options.renderModernChunks !== false
