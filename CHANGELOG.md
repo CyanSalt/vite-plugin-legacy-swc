@@ -1,5 +1,12 @@
 
 
+## [0.5.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.5.0...v0.5.1) (2023-10-18)
+
+
+### Bug Fixes
+
+* lower targets for swc ([29f3008](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/29f30080258a19f7840175f21efb816176fd770f))
+
 ## [0.5.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.4.2...v0.5.0) (2023-10-12)
 
 
