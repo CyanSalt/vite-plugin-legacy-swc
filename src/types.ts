@@ -23,5 +23,5 @@ export interface Options {
   /**
    * default: true
    */
-  renderModernChunks?: boolean
+  renderModernChunks?: boolean,
 }

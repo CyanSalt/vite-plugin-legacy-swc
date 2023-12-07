@@ -49,11 +49,11 @@
     "systemjs": "^6.14.2"
   },
   "devDependencies": {
-    "@cyansalt/eslint-config-preset": "^1.15.0",
+    "@cyansalt/eslint-config-preset": "^1.17.0",
     "@cyansalt/tsconfig": "^2.2.1",
-    "@release-it/conventional-changelog": "^7.0.2",
+    "@release-it/conventional-changelog": "^8.0.1",
     "@types/node": "^18.18.4",
-    "release-it": "^16.2.1",
+    "release-it": "^17.0.0",
     "typescript": "^5.2.2",
     "unbuild": "^2.0.0",
     "vite": "^4.4.11",
