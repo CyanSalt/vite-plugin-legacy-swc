@@ -1,5 +1,17 @@
 
 
+## [1.0.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.5.1...v1.0.0) (2023-12-08)
+
+
+### Features
+
+* build file name optimization ([8e96295](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/8e96295c8a7fc4f96d6979790765012f7850f7d9))
+
+
+### Bug Fixes
+
+* perserve async generator function invocation ([fb61e33](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/fb61e337971c7dac2ee963cff7fb7aeaabbf3759))
+
 ## [0.5.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v0.5.0...v0.5.1) (2023-10-18)
 
 
