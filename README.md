@@ -18,9 +18,6 @@ Compared to `@vitejs/plugin-legacy`, `vite-plugin-legacy-swc` **saves 58% of tim
 
 *\* In my current tests, `@vitejs/plugin-legacy` does not generate source maps for legacy chunks correctly, so the asset size statistics exclude the source maps.*
 
-> [!WARNING]
-> This package is not yet stable. Please take special care before using it in a production environment.
-
 ---
 
 Vite's default browser support baseline is [Native ESM](https://caniuse.com/es6-module), [native ESM dynamic import](https://caniuse.com/es6-module-dynamic-import), and [`import.meta`](https://caniuse.com/mdn-javascript_operators_import_meta). This plugin provides support for legacy browsers that do not support those features when building for production.
