@@ -129,6 +129,9 @@ const legacyEnvVarMarker = `__VITE_IS_LEGACY__`
 
 const $require = createRequire(import.meta.url)
 
+const nonLeadingHashInFileNameRE = /[^/]+\[hash(?::\d+)?\]/
+const prefixedHashInFileNameRE = /\W?\[hash(:\d+)?\]/
+
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let resolvedConfig: ResolvedConfig
   let targets: Options['targets']
@@ -160,7 +163,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     )
   }
 
-  const debugFlags = (process.env.DEBUG ?? '').split(',')
+  const debugFlags = (process.env.DEBUG || '').split(',')
   const isDebug
     = debugFlags.includes('vite:*') || debugFlags.includes('vite:legacy')
 
@@ -340,9 +343,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
       const getLegacyOutputFileName = (
         fileNames:
-        | string
-        | ((chunkInfo: PreRenderedChunk) => string)
-        | undefined,
+          | string
+          | ((chunkInfo: PreRenderedChunk) => string)
+          | undefined,
         defaultFileName = '[name]-legacy-[hash].js',
       ): string | ((chunkInfo: PreRenderedChunk) => string) => {
         if (!fileNames) {
@@ -356,14 +359,16 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           if (fileName.includes('[name]')) {
             // [name]-[hash].[format] -> [name]-legacy-[hash].[format]
             fileName = fileName.replace('[name]', '[name]-legacy')
-          } else if (fileName.includes('[hash]')) {
+          } else if (nonLeadingHashInFileNameRE.test(fileName)) {
             // custom[hash].[format] -> [name]-legacy[hash].[format]
             // custom-[hash].[format] -> [name]-legacy-[hash].[format]
             // custom.[hash].[format] -> [name]-legacy.[hash].[format]
-            fileName = fileName.replace(/[.-]?\[hash\]/, '-legacy$&')
+            // custom.[hash:10].[format] -> custom-legacy.[hash:10].[format]
+            fileName = fileName.replace(prefixedHashInFileNameRE, '-legacy$&')
           } else {
             // entry.js -> entry-legacy.js
-            fileName = fileName.replace(/(.+)\.(.+)/, '$1-legacy.$2')
+            // entry.min.js -> entry-legacy.min.js
+            fileName = fileName.replace(/(.+?)\.(.+)/, '$1-legacy.$2')
           }
 
           return fileName
@@ -692,7 +697,7 @@ export async function detectPolyfills(
   const result = await swc.transform(code, {
     swcrc: false,
     configFile: false,
-    env: createSwcEnvOptions(targets),
+    env: createSwcEnvOptions(targets, {}),
   })
   const ast = await swc.parse(result.code)
   for (const node of ast.body) {
@@ -710,7 +715,7 @@ export async function detectPolyfills(
 
 function createSwcEnvOptions(
   targets: any,
-  { needPolyfills = true }: { needPolyfills?: boolean } = {},
+  { needPolyfills = true }: { needPolyfills?: boolean },
 ): EnvConfig {
   return {
     targets,
