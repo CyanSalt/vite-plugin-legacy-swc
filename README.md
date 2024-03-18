@@ -63,7 +63,7 @@ export default {
 ### `modernTargets`
 
 - **Type:** `string | string[]`
-- **Default:** [`'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'`](https://browsersl.ist/#q=edge%3E%3D80%2C+firefox%3E%3D72%2C+chrome%3E%3D80%2C+safari%3E%3D13.1%2C+chromeAndroid%3E%3D80%2C+iOS%3E%3D13.1)
+- **Default:** [`'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'`](https://browsersl.ist/#q=edge%3E%3D79%2C+firefox%3E%3D67%2C+chrome%3E%3D64%2C+safari%3E%3D12%2C+chromeAndroid%3E%3D64%2C+iOS%3E%3D12)
 
   If explicitly set, it's passed on to [`@swc/core`](https://swc.rs/docs/configuration/supported-browsers#targets) when rendering **modern chunks**.
 
