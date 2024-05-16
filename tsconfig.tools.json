@@ -2,8 +2,7 @@
   "extends": "@cyansalt/tsconfig/tsconfig.app",
   "include": [
     "**/*.js",
-    "**/*.ts",
-    ".eslintrc.cjs"
+    "**/*.ts"
   ],
   "exclude": [
     "**/dist",
