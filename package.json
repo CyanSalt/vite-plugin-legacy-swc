@@ -56,6 +56,7 @@
     "@release-it/conventional-changelog": "^8.0.1",
     "@types/node": "^20.11.26",
     "acorn": "^8.11.3",
+    "eslint": "^9.3.0",
     "picocolors": "^1.0.0",
     "release-it": "^17.1.1",
     "rollup": "^4.13.0",
