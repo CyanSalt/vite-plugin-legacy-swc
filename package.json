@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-legacy-swc",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Provides legacy browsers support for the production build with SWC",
   "type": "module",
   "main": "./dist/index.cjs",

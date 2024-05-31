@@ -1,5 +1,18 @@
 
 
+## [1.2.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.1.0...v1.2.0) (2024-05-31)
+
+
+### Features
+
+* support `additionalModernPolyfills` ([4e880b3](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/4e880b3d7819a36f045019350345fb9b6ef3e6af))
+
+
+### Bug Fixes
+
+* group discovered polyfills by output ([98cd27f](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/98cd27f82038d7859eee9fb6a41c4f33367a9258))
+* improve deterministic polyfills discovery ([f28f633](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/f28f633173b6c006055f8aa0484b3ae49157f8b6))
+
 ## [1.1.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.0.0...v1.1.0) (2024-03-19)
 
 
