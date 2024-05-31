@@ -174,10 +174,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   const modernPolyfills = new Set<string>()
   const legacyPolyfills = new Set<string>()
   // When discovering polyfills in `renderChunk`, the hook may be non-deterministic, so we group the
-  // modern and legacy polyfills in a sorted map before merging them.
-  let chunkFileNameToPolyfills:
-    | Map<string, { modern: Set<string>, legacy: Set<string> }>
-    | undefined
+  // modern and legacy polyfills in a sorted chunks map for each rendered outputs before merging them.
+  const outputToChunkFileNameToPolyfills = new WeakMap<
+    NormalizedOutputOptions,
+    Map<string, { modern: Set<string>, legacy: Set<string> }> | null
+  >()
 
   if (Array.isArray(options.modernPolyfills) && genModern) {
     options.modernPolyfills.forEach((i) => {
@@ -282,12 +283,18 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return
       }
 
+      const chunkFileNameToPolyfills
+        = outputToChunkFileNameToPolyfills.get(opts)
+      if (!chunkFileNameToPolyfills) {
+        throw new Error(
+          'Internal vite-plugin-legacy-swc error: discovered polyfills should exist',
+        )
+      }
+
       if (!isLegacyBundle(bundle, opts)) {
         // Merge discovered modern polyfills to `modernPolyfills`
-        if (chunkFileNameToPolyfills) {
-          for (const { modern } of chunkFileNameToPolyfills.values()) {
-            modern.forEach((p) => modernPolyfills.add(p))
-          }
+        for (const { modern } of chunkFileNameToPolyfills.values()) {
+          modern.forEach((p) => modernPolyfills.add(p))
         }
         if (!modernPolyfills.size) {
           return
@@ -319,10 +326,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       }
 
       // Merge discovered legacy polyfills to `legacyPolyfills`
-      if (chunkFileNameToPolyfills) {
-        for (const { legacy } of chunkFileNameToPolyfills.values()) {
-          legacy.forEach((p) => legacyPolyfills.add(p))
-        }
+      for (const { legacy } of chunkFileNameToPolyfills.values()) {
+        legacy.forEach((p) => legacyPolyfills.add(p))
       }
 
       // legacy bundle
@@ -365,8 +370,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     enforce: 'post',
     apply: 'build',
 
-    renderStart() {
-      chunkFileNameToPolyfills = undefined
+    renderStart(opts) {
+      // Empty the nested map for this output
+      outputToChunkFileNameToPolyfills.set(opts, null)
     },
 
     configResolved(config) {
@@ -457,7 +463,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return null
       }
 
-      // On first run, intialize the map with sorted chunk file names
+      // On first run, initialize the map with sorted chunk file names
+      let chunkFileNameToPolyfills = outputToChunkFileNameToPolyfills.get(opts)
       if (!chunkFileNameToPolyfills) {
         chunkFileNameToPolyfills = new Map()
         Object.keys(chunks).forEach((fileName) => {
@@ -466,8 +473,14 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
             legacy: new Set(),
           })
         })
+        outputToChunkFileNameToPolyfills.set(opts, chunkFileNameToPolyfills)
       }
-      const polyfillsDiscovered = chunkFileNameToPolyfills.get(chunk.fileName)!
+      const polyfillsDiscovered = chunkFileNameToPolyfills.get(chunk.fileName)
+      if (!polyfillsDiscovered) {
+        throw new Error(
+          `Internal vite-plugin-legacy-swc error: discovered polyfills for ${chunk.fileName} should exist`,
+        )
+      }
 
       if (!isLegacyChunk(chunk, opts)) {
         if (
