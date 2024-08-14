@@ -1,5 +1,12 @@
 
 
+## [1.2.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.0...v1.2.1) (2024-08-14)
+
+
+### Bug Fixes
+
+* add ctxt on nodes ([bd21942](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/bd2194294a7daa81e58dae1cd99458527717928f))
+
 ## [1.2.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.1.0...v1.2.0) (2024-05-31)
 
 
