@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { createRequire } from 'module'
 import path from 'path'
-import url from 'url'
+import { fileURLToPath } from 'url'
 import type {
   EnvConfig,
   JsMinifyOptions,
@@ -93,7 +93,7 @@ function toOutputFilePathInHtml({
   if (relative && !config.build.ssr) {
     return toRelative(filename, hostId)
   } else {
-    return config.base + filename
+    return joinUrlSegments(config['decodedBase'] ?? config.base, filename)
   }
 }
 function getBaseInHTML(urlRelativePath: string, config: ResolvedConfig) {
@@ -105,6 +105,18 @@ function getBaseInHTML(urlRelativePath: string, config: ResolvedConfig) {
       './',
     )
     : config.base
+}
+function joinUrlSegments(a: string, b: string): string {
+  if (!a || !b) {
+    return a || b || ''
+  }
+  if (a[a.length - 1] === '/') {
+    a = a.slice(0, Math.max(0, a.length - 1))
+  }
+  if (b[0] !== '/') {
+    b = '/' + b
+  }
+  return a + b
 }
 
 function toAssetPathFromHtml(
@@ -130,7 +142,7 @@ const legacyEnvVarMarker = `__VITE_IS_LEGACY__`
 const $require = createRequire(import.meta.url)
 
 const nonLeadingHashInFileNameRE = /[^/]+\[hash(?::\d+)?\]/
-const prefixedHashInFileNameRE = /\W?\[hash(:\d+)?\]/
+const prefixedHashInFileNameRE = /\W?\[hash(?::\d+)?\]/
 
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let resolvedConfig: ResolvedConfig
@@ -148,11 +160,6 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   // same with above but by browserslist syntax
   // es2020 = chrome 80+, safari 13.1+, firefox 72+, edge 80+
   // https://github.com/evanw/esbuild/issues/121#issuecomment-646956379
-  // const modernTargetsSwc
-  //   = 'edge>=80, firefox>=72, chrome>=80, safari>=13.1, chromeAndroid>=80, iOS>=13.1'
-  // However, since esbuild only transform syntax rather than polyfill
-  // the output is not guaranteed to support es2020
-  // so this feature cannot be used as a basis for compatibility
   const modernTargetsSwc
     = 'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'
 
@@ -795,6 +802,7 @@ function createSwcEnvOptions(
 ): EnvConfig {
   return {
     targets,
+    bugfixes: true,
     loose: false,
     mode: needPolyfills ? 'usage' : undefined,
     coreJs: needPolyfills
@@ -829,7 +837,7 @@ async function buildPolyfillChunk({
   const res = await build({
     mode,
     // so that everything is resolved from here
-    root: path.dirname(url.fileURLToPath(import.meta.url)),
+    root: path.dirname(fileURLToPath(import.meta.url)),
     configFile: false,
     logLevel: 'error',
     plugins: [polyfillsPlugin(imports, excludeSystemJS)],
@@ -987,25 +995,31 @@ function recordAndRemovePolyfillSwcPlugin(
 }
 
 function wrapIIFESwcPlugin(): SwcPlugin {
+  // `ctxt` on nodes will be validated by @swc/core@>=1.7.0
   return program => {
     program.body = [
       {
         type: 'ExpressionStatement',
         span: { start: 0, end: 0, ctxt: 0 },
+        ['ctxt' as never]: 0,
         expression: {
           type: 'CallExpression',
           span: { start: 0, end: 0, ctxt: 0 },
+          ['ctxt' as never]: 0,
           callee: {
             type: 'ParenthesisExpression',
             span: { start: 0, end: 0, ctxt: 0 },
+            ['ctxt' as never]: 0,
             expression: {
               type: 'FunctionExpression',
               params: [],
               decorators: [],
               span: { start: 0, end: 0, ctxt: 0 },
+              ['ctxt' as never]: 0,
               body: {
                 type: 'BlockStatement',
                 span: { start: 0, end: 0, ctxt: 0 },
+                ['ctxt' as never]: 0,
                 stmts: program.body as Statement[],
               },
               generator: false,
