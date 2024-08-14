@@ -8,6 +8,9 @@ export default config({
           project: './tsconfig.tools.json',
         },
       },
+    },
+    {
+      files: ['src/**'],
       rules: {
         'unicorn/prefer-node-protocol': 'off',
       },
