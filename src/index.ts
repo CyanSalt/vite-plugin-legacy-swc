@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import crypto from 'crypto'
 import { createRequire } from 'module'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -1073,12 +1073,19 @@ function wrapIIFESwcPlugin(): SwcPlugin {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- crypto.hash is supported in Node 21.7.0+, 20.12.0+
+const hash = crypto.hash ?? ((
+  algorithm: string,
+  data: crypto.BinaryLike,
+  outputEncoding: crypto.BinaryToTextEncoding,
+) => crypto.createHash(algorithm).update(data).digest(outputEncoding))
+
 export const cspHashes = [
   safari10NoModuleFix,
   systemJSInlineCode,
   detectModernBrowserCode,
   dynamicFallbackInlineCode,
-].map((i) => createHash('sha256').update(i).digest('base64'))
+].map((i) => hash('sha256', i, 'base64'))
 
 export type { Options }
 
