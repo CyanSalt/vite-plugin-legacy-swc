@@ -14,7 +14,9 @@ import MagicString from 'magic-string'
 import colors from 'picocolors'
 import type {
   NormalizedOutputOptions,
+  OutputAsset,
   OutputBundle,
+  OutputChunk,
   OutputOptions,
   PreRenderedChunk,
   RenderedChunk,
@@ -312,7 +314,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
             modernPolyfills,
           )
         }
-        const polyfillChunk = await buildPolyfillChunk({
+        await buildPolyfillChunk({
           mode: resolvedConfig.mode,
           imports: modernPolyfills,
           bundle,
@@ -321,10 +323,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           format: 'es',
           rollupOutputOptions: opts,
           excludeSystemJS: true,
+          prependModernChunkLegacyGuard: genLegacy,
         })
-        if (genLegacy && polyfillChunk) {
-          polyfillChunk.code = modernChunkLegacyGuard + polyfillChunk.code
-        }
         return
       }
 
@@ -823,6 +823,7 @@ async function buildPolyfillChunk({
   format,
   rollupOutputOptions,
   excludeSystemJS,
+  prependModernChunkLegacyGuard,
 }: {
   mode: string,
   imports: Set<string>,
@@ -832,6 +833,7 @@ async function buildPolyfillChunk({
   format: 'iife' | 'es',
   rollupOutputOptions: NormalizedOutputOptions,
   excludeSystemJS?: boolean,
+  prependModernChunkLegacyGuard?: boolean,
 }) {
   let { minify, assetsDir, terserOptions, sourcemap } = buildOptions
   const res = await build({
@@ -840,11 +842,15 @@ async function buildPolyfillChunk({
     root: path.dirname(fileURLToPath(import.meta.url)),
     configFile: false,
     logLevel: 'error',
-    plugins: [polyfillsPlugin(imports, excludeSystemJS)],
+    plugins: [
+      polyfillsPlugin(imports, excludeSystemJS),
+      prependModernChunkLegacyGuard && prependModernChunkLegacyGuardPlugin(),
+    ],
     build: {
       write: false,
       minify: false,
       assetsDir,
+      sourcemap,
       rollupOptions: {
         input: {
           polyfills: polyfillId,
@@ -870,7 +876,9 @@ async function buildPolyfillChunk({
   })
   const rollupOutput = Array.isArray(res) ? res[0] : res
   if (!('output' in rollupOutput)) return
-  const polyfillChunk = rollupOutput.output[0]
+  const polyfillChunk = rollupOutput.output.find(
+    (chunk) => chunk.type === 'chunk' && chunk.isEntry,
+  ) as OutputChunk
 
   if (minify) {
     const swc = await loadSwc()
@@ -912,6 +920,16 @@ async function buildPolyfillChunk({
 
   // add the chunk to the bundle
   bundle[polyfillChunk.fileName] = polyfillChunk
+  if (polyfillChunk.sourcemapFileName) {
+    const polyfillChunkMapAsset = rollupOutput.output.find(
+      (chunk) =>
+        chunk.type === 'asset'
+        && chunk.fileName === polyfillChunk.sourcemapFileName,
+    ) as OutputAsset | undefined
+    if (polyfillChunkMapAsset) {
+      bundle[polyfillChunk.sourcemapFileName] = polyfillChunkMapAsset
+    }
+  }
 
   return polyfillChunk
 }
@@ -933,6 +951,27 @@ function polyfillsPlugin(
           [...imports].map((i) => `import ${JSON.stringify(i)};`).join('')
           + (excludeSystemJS ? '' : `import "systemjs/dist/s.min.js";`)
         )
+      }
+    },
+  }
+}
+
+function prependModernChunkLegacyGuardPlugin(): Plugin {
+  let sourceMapEnabled!: boolean
+  return {
+    name: 'vite:legacy-prepend-modern-chunk-legacy-guard',
+    configResolved(config) {
+      sourceMapEnabled = Boolean(config.build.sourcemap)
+    },
+    renderChunk(code) {
+      if (!sourceMapEnabled) {
+        return modernChunkLegacyGuard + code
+      }
+      const ms = new MagicString(code)
+      ms.prepend(modernChunkLegacyGuard)
+      return {
+        code: ms.toString(),
+        map: ms.generateMap({ hires: 'boundary' }),
       }
     },
   }
