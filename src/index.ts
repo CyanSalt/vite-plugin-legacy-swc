@@ -579,7 +579,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       }
       const transformResult = await swc.transform(raw, {
         ...swcOptions,
-        inputSourceMap: undefined, // sourceMaps ? chunk.map : undefined, `.map` TODO: moved to OutputChunk?
+        inputSourceMap: undefined,
         minify: Boolean(resolvedConfig.build.minify && minifyOptions.mangle),
         jsc: {
           // mangle only
