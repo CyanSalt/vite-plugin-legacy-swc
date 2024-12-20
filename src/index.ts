@@ -390,7 +390,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
       modernTargets = options.modernTargets || modernTargetsSwc
       if (isDebug) {
-        console.log(`[@vitejs/plugin-legacy-swc] modernTargets:`, modernTargets)
+        console.log(`[vite-plugin-legacy-swc] modernTargets:`, modernTargets)
       }
 
       if (!genLegacy || resolvedConfig.build.ssr) {
