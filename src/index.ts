@@ -238,7 +238,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           config.build.cssTarget = 'chrome61'
         }
 
-        if (genLegacy) {
+        // Babel-based legacy plugin will only override esbuild's target when rendering legacy chunks.
+        // This will cause syntax transformation to be inconsistent with polyfill behavior when rendering modern chunks only.
+        // For example, when using `Promise.allSettled` and nullish coalescing operator (both from ES2020),
+        // the latter will be retained while the former will be polyfilled.
+        // Here is a simple heuristic strategy: `target` will be overridden when modern polyfill detection is turned on
+        // if (genLegacy) { ... }
+        if (genLegacy || options.modernPolyfills && !Array.isArray(options.modernPolyfills)) {
           // Vite's default target browsers are **not** the same.
           // See https://github.com/vitejs/vite/pull/10052#issuecomment-1242076461
           overriddenBuildTarget = config.build.target !== undefined
@@ -269,14 +275,14 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       if (overriddenBuildTarget) {
         config.logger.warn(
           colors.yellow(
-            `plugin-legacy-swc overrode 'build.target'. You should pass 'targets' as an option to this plugin with the list of legacy browsers to support instead.`,
+            `vite-plugin-legacy-swc overrode 'build.target'. You should pass 'targets' as an option to this plugin with the list of legacy browsers to support instead.`,
           ),
         )
       }
       if (overriddenDefaultModernTargets) {
         config.logger.warn(
           colors.yellow(
-            `plugin-legacy-swc 'modernTargets' option overrode the builtin targets of modern chunks. Some versions of browsers between legacy and modern may not be supported.`,
+            `vite-plugin-legacy-swc 'modernTargets' option overrode the builtin targets of modern chunks. Some versions of browsers between legacy and modern may not be supported.`,
           ),
         )
       }
