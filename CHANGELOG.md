@@ -1,5 +1,16 @@
 
 
+## [1.2.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.1...v1.2.2) (2024-12-20)
+
+### Bug Fixes
+
+* generate sourcemap for polyfill chunks, https://github.com/vitejs/vite/commit/f311ff3c2b19636457c3023095ef32ab9a96b84a[#diff](https://github.com/CyanSalt/vite-plugin-legacy-swc/issues/diff)-84204d8a3f75f1603eb03a8aac4a229855fecee87636307619b9f499041466f8L144 ([a78574a](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/a78574a5556de7da3e0454f20d8142c8298a1c3e)), closes [/github.com/vitejs/vite/commit/f311ff3c2b19636457c3023095ef32ab9a96b84a#diff-84204d8a3f75f1603eb03a8aac4a229855fecee87636307619b9f499041466f8L144](https://github.com/CyanSalt//github.com/vitejs/vite/commit/f311ff3c2b19636457c3023095ef32ab9a96b84a/issues/diff-84204d8a3f75f1603eb03a8aac4a229855fecee87636307619b9f499041466f8L144)
+* log label ([4e0687e](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/4e0687ef12dc9519dcb826daa466e1923094d444))
+
+### Performance Improvements
+
+* use crypto.hash when available, https://github.com/vitejs/vite/commit/2a148844cf2382a5377b75066351f00207843352[#diff](https://github.com/CyanSalt/vite-plugin-legacy-swc/issues/diff)-ab75c34fa418085884af97e74c9166830b9f0a3456f9d3336e0c075d6ae9b05aR974 ([be5b068](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/be5b068b39b16a3fdd55a0ce10754445e5e3c165)), closes [/github.com/vitejs/vite/commit/2a148844cf2382a5377b75066351f00207843352#diff-ab75c34fa418085884af97e74c9166830b9f0a3456f9d3336e0c075d6ae9b05aR974](https://github.com/CyanSalt//github.com/vitejs/vite/commit/2a148844cf2382a5377b75066351f00207843352/issues/diff-ab75c34fa418085884af97e74c9166830b9f0a3456f9d3336e0c075d6ae9b05aR974)
+
 ## [1.2.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.0...v1.2.1) (2024-08-14)
 
 
