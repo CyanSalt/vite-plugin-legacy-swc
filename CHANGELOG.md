@@ -1,5 +1,11 @@
 
 
+## [1.2.3](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.2...v1.2.3) (2024-12-20)
+
+### Bug Fixes
+
+* tranpile when modern polyfills is auto detected ([15c330a](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/15c330aaae3c48d3b5a146808e58d1c3355c82f9))
+
 ## [1.2.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.1...v1.2.2) (2024-12-20)
 
 ### Bug Fixes
