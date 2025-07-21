@@ -174,7 +174,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   const isDebug
     = debugFlags.includes('vite:*') || debugFlags.includes('vite:legacy')
 
-    const assumptions = options.assumptions || {}
+  const assumptions = options.assumptions ?? {}
 
   const facadeToLegacyChunkMap = new Map()
   const facadeToLegacyPolyfillMap = new Map()
@@ -593,9 +593,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       const transformResult = await swc.transform(raw, {
         ...swcOptions,
         inputSourceMap: undefined,
-        assumptions,
         minify: Boolean(resolvedConfig.build.minify && minifyOptions.mangle),
         jsc: {
+          assumptions,
           // mangle only
           minify: {
             ...minifyOptions,
