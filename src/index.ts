@@ -41,12 +41,9 @@ import type { Options } from './types'
 
 // lazy load swc since it's not used during dev
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-let loadedSwc: typeof import('@swc/core') | undefined
+let loadedSwc: Promise<typeof import('@swc/core')> | undefined
 async function loadSwc() {
-  if (!loadedSwc) {
-    loadedSwc = await import('@swc/core')
-  }
-  return loadedSwc
+  return (loadedSwc ??= await import('@swc/core'))
 }
 
 // The requested module 'browserslist' is a CommonJS module
