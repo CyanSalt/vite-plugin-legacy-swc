@@ -29,4 +29,10 @@ export interface Options {
    * default: true
    */
   renderModernChunks?: boolean,
+  /**
+   * @see https://swc.rs/docs/configuration/compilation
+   *
+   * default: {}
+   */
+  assumptions?: Record<string, boolean>,
 }

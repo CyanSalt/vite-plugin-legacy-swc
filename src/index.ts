@@ -174,6 +174,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   const isDebug
     = debugFlags.includes('vite:*') || debugFlags.includes('vite:legacy')
 
+    const assumptions = options.assumptions || {}
+
   const facadeToLegacyChunkMap = new Map()
   const facadeToLegacyPolyfillMap = new Map()
   const facadeToModernPolyfillMap = new Map()
@@ -354,6 +356,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         await detectPolyfills(
           `Promise.resolve(); Promise.all();`,
           targets,
+          assumptions,
           legacyPolyfills,
         )
       }
@@ -506,7 +509,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           && genModern
         ) {
           // analyze and record modern polyfills
-          await detectPolyfills(raw, modernTargets, polyfillsDiscovered.modern)
+          await detectPolyfills(raw, modernTargets, assumptions, polyfillsDiscovered.modern)
         }
 
         const ms = new MagicString(raw)
@@ -590,6 +593,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       const transformResult = await swc.transform(raw, {
         ...swcOptions,
         inputSourceMap: undefined,
+        assumptions,
         minify: Boolean(resolvedConfig.build.minify && minifyOptions.mangle),
         jsc: {
           // mangle only
@@ -784,6 +788,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 export async function detectPolyfills(
   code: string,
   targets: any,
+  assumptions: Record<string, boolean>,
   list: Set<string>,
 ): Promise<void> {
   const swc = await loadSwc()
@@ -791,6 +796,9 @@ export async function detectPolyfills(
     swcrc: false,
     configFile: false,
     env: createSwcEnvOptions(targets, {}),
+    jsc: {
+      assumptions,
+    },
   })
   const ast = await swc.parse(result.code)
   for (const node of ast.body) {
