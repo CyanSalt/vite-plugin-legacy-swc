@@ -283,6 +283,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           ),
         )
       }
+      if (config.isWorker) {
+        config.logger.warn(
+          colors.yellow(
+            `vite-plugin-legacy-swc should not be passed to 'worker.plugins'. Pass to 'plugins' instead. Note that generating legacy chunks for workers are not supported by vite-plugin-legacy-swc.`,
+          ),
+        )
+      }
     },
   }
 
