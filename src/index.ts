@@ -1,7 +1,7 @@
-import crypto from 'crypto'
-import { createRequire } from 'module'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import crypto from 'node:crypto'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type {
   EnvConfig,
   JsMinifyOptions,
@@ -13,19 +13,11 @@ import browserslist from 'browserslist'
 import MagicString from 'magic-string'
 import colors from 'picocolors'
 import type {
-  NormalizedOutputOptions,
-  OutputAsset,
-  OutputBundle,
-  OutputChunk,
-  OutputOptions,
-  PreRenderedChunk,
-  RenderedChunk,
-} from 'rollup'
-import type {
   BuildOptions,
   HtmlTagDescriptor,
   Plugin,
   ResolvedConfig,
+  Rollup,
 } from 'vite'
 import { build, normalizePath } from 'vite'
 import {
@@ -43,7 +35,7 @@ import type { Options } from './types'
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 let loadedSwc: Promise<typeof import('@swc/core')> | undefined
 async function loadSwc() {
-  return (loadedSwc ??= await import('@swc/core'))
+  return (loadedSwc ??= import('@swc/core'))
 }
 
 // The requested module 'browserslist' is a CommonJS module
@@ -184,7 +176,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   // When discovering polyfills in `renderChunk`, the hook may be non-deterministic, so we group the
   // modern and legacy polyfills in a sorted chunks map for each rendered outputs before merging them.
   const outputToChunkFileNameToPolyfills = new WeakMap<
-    NormalizedOutputOptions,
+    Rollup.NormalizedOutputOptions,
     Map<string, { modern: Set<string>, legacy: Set<string> }> | null
   >()
 
@@ -421,10 +413,10 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       const getLegacyOutputFileName = (
         fileNames:
           | string
-          | ((chunkInfo: PreRenderedChunk) => string)
+          | ((chunkInfo: Rollup.PreRenderedChunk) => string)
           | undefined,
         defaultFileName = '[name]-legacy-[hash].js',
-      ): string | ((chunkInfo: PreRenderedChunk) => string) => {
+      ): string | ((chunkInfo: Rollup.PreRenderedChunk) => string) => {
         if (!fileNames) {
           return path.posix.join(resolvedConfig.build.assetsDir, defaultFileName)
         }
@@ -453,8 +445,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       }
 
       const createLegacyOutput = (
-        outputOptions: OutputOptions = {},
-      ): OutputOptions => {
+        outputOptions: Rollup.OutputOptions = {},
+      ): Rollup.OutputOptions => {
         return {
           ...outputOptions,
           format: 'system',
@@ -487,12 +479,12 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       let chunkFileNameToPolyfills = outputToChunkFileNameToPolyfills.get(opts)
       if (!chunkFileNameToPolyfills) {
         chunkFileNameToPolyfills = new Map()
-        Object.keys(chunks).forEach((fileName) => {
-          chunkFileNameToPolyfills!.set(fileName, {
+        for (const fileName of Object.keys(chunks)) {
+          chunkFileNameToPolyfills.set(fileName, {
             modern: new Set(),
             legacy: new Set(),
           })
-        })
+        }
         outputToChunkFileNameToPolyfills.set(opts, chunkFileNameToPolyfills)
       }
       const polyfillsDiscovered = chunkFileNameToPolyfills.get(chunk.fileName)
@@ -509,7 +501,12 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           && genModern
         ) {
           // analyze and record modern polyfills
-          await detectPolyfills(raw, modernTargets, assumptions, polyfillsDiscovered.modern)
+          await detectPolyfills(
+            raw,
+            modernTargets,
+            assumptions,
+            polyfillsDiscovered.modern,
+          )
         }
 
         const ms = new MagicString(raw)
@@ -845,11 +842,11 @@ async function buildPolyfillChunk({
 }: {
   mode: string,
   imports: Set<string>,
-  bundle: OutputBundle,
+  bundle: Rollup.OutputBundle,
   facadeToChunkMap: Map<string, string>,
   buildOptions: BuildOptions,
   format: 'iife' | 'es',
-  rollupOutputOptions: NormalizedOutputOptions,
+  rollupOutputOptions: Rollup.NormalizedOutputOptions,
   excludeSystemJS?: boolean,
   prependModernChunkLegacyGuard?: boolean,
 }) {
@@ -898,7 +895,7 @@ async function buildPolyfillChunk({
   if (!('output' in rollupOutput)) return
   const polyfillChunk = rollupOutput.output.find(
     (chunk) => chunk.type === 'chunk' && chunk.isEntry,
-  ) as OutputChunk
+  ) as Rollup.OutputChunk
 
   if (minify) {
     const swc = await loadSwc()
@@ -945,7 +942,7 @@ async function buildPolyfillChunk({
       (chunk) =>
         chunk.type === 'asset'
         && chunk.fileName === polyfillChunk.sourcemapFileName,
-    ) as OutputAsset | undefined
+    ) as Rollup.OutputAsset | undefined
     if (polyfillChunkMapAsset) {
       bundle[polyfillChunk.sourcemapFileName] = polyfillChunkMapAsset
     }
@@ -987,6 +984,7 @@ function prependModernChunkLegacyGuardPlugin(): Plugin {
       if (!sourceMapEnabled) {
         return modernChunkLegacyGuard + code
       }
+
       const ms = new MagicString(code)
       ms.prepend(modernChunkLegacyGuard)
       return {
@@ -997,13 +995,16 @@ function prependModernChunkLegacyGuardPlugin(): Plugin {
   }
 }
 
-function isLegacyChunk(chunk: RenderedChunk, options: NormalizedOutputOptions) {
+function isLegacyChunk(
+  chunk: Rollup.RenderedChunk,
+  options: Rollup.NormalizedOutputOptions,
+) {
   return options.format === 'system' && chunk.fileName.includes('-legacy')
 }
 
 function isLegacyBundle(
-  bundle: OutputBundle,
-  options: NormalizedOutputOptions,
+  bundle: Rollup.OutputBundle,
+  options: Rollup.NormalizedOutputOptions,
 ) {
   if (options.format === 'system') {
     const entryChunk = Object.values(bundle).find(
@@ -1093,20 +1094,25 @@ function wrapIIFESwcPlugin(): SwcPlugin {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- crypto.hash is supported in Node 21.7.0+, 20.12.0+
-const hash = crypto.hash ?? ((
-  algorithm: string,
-  data: crypto.BinaryLike,
-  outputEncoding: crypto.BinaryToTextEncoding,
-) => crypto.createHash(algorithm).update(data).digest(outputEncoding))
-
 export const cspHashes = [
   safari10NoModuleFix,
   systemJSInlineCode,
   detectModernBrowserCode,
   dynamicFallbackInlineCode,
-].map((i) => hash('sha256', i, 'base64'))
+].map((i) => crypto.hash('sha256', i, 'base64'))
 
 export type { Options }
 
 export default viteLegacyPlugin
+
+// Compat for require
+function viteLegacyPluginCjs(this: unknown, options: Options): Plugin[] {
+  return viteLegacyPlugin.call(this, options)
+}
+Object.assign(viteLegacyPluginCjs, {
+  cspHashes,
+  default: viteLegacyPluginCjs,
+  detectPolyfills,
+})
+
+export { viteLegacyPluginCjs as 'module.exports' }

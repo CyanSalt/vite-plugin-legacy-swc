@@ -9,6 +9,6 @@ export default defineConfig({
     testTimeout: 20000,
   },
   esbuild: {
-    target: 'node14',
+    target: 'node20',
   },
 })

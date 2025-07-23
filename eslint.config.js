@@ -9,11 +9,5 @@ export default config({
         },
       },
     },
-    {
-      files: ['src/**'],
-      rules: {
-        'unicorn/prefer-node-protocol': 'off',
-      },
-    },
   ],
 })
