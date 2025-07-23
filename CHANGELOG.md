@@ -1,5 +1,27 @@
 
 
+## [2.0.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.3...v2.0.0) (2025-07-23)
+
+### ⚠ BREAKING CHANGES
+
+* esm only
+* remove `location.protocol!="file:"` condition for modern android webview, https://github.com/vitejs/vite/pull/20179
+
+### Features
+
+* add `assumptions` option, https://github.com/vitejs/vite/pull/19719 ([9925225](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/9925225fb9b7d2e6aa9e8e6e03ea4e77371690fe))
+* add `sourcemapBaseUrl` support, https://github.com/vitejs/vite/pull/19281 ([7757047](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/7757047e62381af6d757499da3ea633fd1cf3d36))
+* esm only ([c170b61](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/c170b61312d79c6881fbdf5c49457dc99273c130))
+
+### Bug Fixes
+
+* build respect `hashCharacters` config, https://github.com/vitejs/vite/pull/19262 ([40eaf95](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/40eaf95953bc6d2e228970617022220199990643))
+* don't lower CSS if legacy chunks are not generated, https://github.com/vitejs/vite/pull/20392 ([5c1401f](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/5c1401fbb97ce4d0a9fa9b1a517413d8efb24d1f))
+* fix assumptions usage ([d919b92](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/d919b92f143c5e1caa09291b6aa700bca68e8444))
+* import swc once, https://github.com/vitejs/vite/pull/19152 ([01d5f5a](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/01d5f5a0f97df7c841f4f215343627e04bd86c47))
+* remove `location.protocol!="file:"` condition for modern android webview, https://github.com/vitejs/vite/pull/20179 ([2b9a7d9](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/2b9a7d98ccd100cad3d37b2ff9eccd8bccdc85e9))
+* warn if plugin-legacy is passed to `worker.plugins`, https://github.com/vitejs/vite/pull/19079 ([2797160](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/27971607115e385ee65c3dc4510d460059575e0d))
+
 ## [1.2.3](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.2...v1.2.3) (2024-12-20)
 
 ### Bug Fixes
