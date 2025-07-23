@@ -41,12 +41,9 @@ import type { Options } from './types'
 
 // lazy load swc since it's not used during dev
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-let loadedSwc: typeof import('@swc/core') | undefined
+let loadedSwc: Promise<typeof import('@swc/core')> | undefined
 async function loadSwc() {
-  if (!loadedSwc) {
-    loadedSwc = await import('@swc/core')
-  }
-  return loadedSwc
+  return (loadedSwc ??= await import('@swc/core'))
 }
 
 // The requested module 'browserslist' is a CommonJS module
@@ -112,7 +109,7 @@ function joinUrlSegments(a: string, b: string): string {
   if (!a || !b) {
     return a || b || ''
   }
-  if (a[a.length - 1] === '/') {
+  if (a.endsWith('/')) {
     a = a.slice(0, Math.max(0, a.length - 1))
   }
   if (b[0] !== '/') {
@@ -177,6 +174,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   const isDebug
     = debugFlags.includes('vite:*') || debugFlags.includes('vite:legacy')
 
+  const assumptions = options.assumptions ?? {}
+
   const facadeToLegacyChunkMap = new Map()
   const facadeToLegacyPolyfillMap = new Map()
   const facadeToModernPolyfillMap = new Map()
@@ -229,7 +228,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           config.build = {}
         }
 
-        if (!config.build.cssTarget) {
+        if (genLegacy && !config.build.cssTarget) {
           // Hint for esbuild that we are targeting legacy browsers when minifying CSS.
           // Full CSS compat table available at https://github.com/evanw/esbuild/blob/78e04680228cf989bdd7d471e02bbc2c8d345dc9/internal/compat/css_table.go
           // But note that only the `HexRGBA` feature affects the minify outcome.
@@ -283,6 +282,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         config.logger.warn(
           colors.yellow(
             `vite-plugin-legacy-swc 'modernTargets' option overrode the builtin targets of modern chunks. Some versions of browsers between legacy and modern may not be supported.`,
+          ),
+        )
+      }
+      if (config.isWorker) {
+        config.logger.warn(
+          colors.yellow(
+            `vite-plugin-legacy-swc should not be passed to 'worker.plugins'. Pass to 'plugins' instead. Note that generating legacy chunks for workers are not supported by vite-plugin-legacy-swc.`,
           ),
         )
       }
@@ -350,6 +356,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         await detectPolyfills(
           `Promise.resolve(); Promise.all();`,
           targets,
+          assumptions,
           legacyPolyfills,
         )
       }
@@ -502,7 +509,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           && genModern
         ) {
           // analyze and record modern polyfills
-          await detectPolyfills(raw, modernTargets, polyfillsDiscovered.modern)
+          await detectPolyfills(raw, modernTargets, assumptions, polyfillsDiscovered.modern)
         }
 
         const ms = new MagicString(raw)
@@ -588,6 +595,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         inputSourceMap: undefined,
         minify: Boolean(resolvedConfig.build.minify && minifyOptions.mangle),
         jsc: {
+          assumptions,
           // mangle only
           minify: {
             ...minifyOptions,
@@ -766,7 +774,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       if (isLegacyBundle(bundle, opts) && genModern) {
         // avoid emitting duplicate assets
         for (const name of Object.keys(bundle)) {
-          if (bundle[name].type === 'asset' && !/.+\.map$/.test(name)) {
+          if (bundle[name].type === 'asset' && !name.endsWith('.map')) {
             delete bundle[name]
           }
         }
@@ -780,6 +788,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 export async function detectPolyfills(
   code: string,
   targets: any,
+  assumptions: Record<string, boolean>,
   list: Set<string>,
 ): Promise<void> {
   const swc = await loadSwc()
@@ -787,6 +796,9 @@ export async function detectPolyfills(
     swcrc: false,
     configFile: false,
     env: createSwcEnvOptions(targets, {}),
+    jsc: {
+      assumptions,
+    },
   })
   const ast = await swc.parse(result.code)
   for (const node of ast.body) {
@@ -863,7 +875,9 @@ async function buildPolyfillChunk({
         },
         output: {
           format,
+          hashCharacters: rollupOutputOptions.hashCharacters,
           entryFileNames: rollupOutputOptions.entryFileNames,
+          sourcemapBaseUrl: rollupOutputOptions.sourcemapBaseUrl,
         },
       },
     },

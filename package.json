@@ -4,12 +4,12 @@
   "description": "Provides legacy browsers support for the production build with SWC",
   "type": "module",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
   },
@@ -21,7 +21,7 @@
   },
   "scripts": {
     "lint": "eslint --fix './**/*.{js,ts}'",
-    "prepack": "unbuild",
+    "prepack": "tsdown",
     "release": "release-it",
     "test": "vitest"
   },
@@ -61,8 +61,8 @@
     "release-it": "^17.10.0",
     "rollup": "^4.28.1",
     "terser": "^5.37.0",
+    "tsdown": "^0.12.9",
     "typescript": "^5.7.2",
-    "unbuild": "^3.0.1",
     "vite": "^6.0.4",
     "vitest": "^2.1.8"
   },

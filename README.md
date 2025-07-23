@@ -143,6 +143,8 @@ export default {
 
   Set to `false` to only output the legacy bundles that support all target browsers.
 
+  This is also useful when running the project locally using `file:` protocol, as loading modern chunks with `type="module"` may trigger CORS restrictions. To avoid this issue, simply set `renderModernChunks` to `false` to exclusively use legacy chunks instead.
+
 ## Browsers that supports ESM but does not support widely-available features
 
 The legacy plugin offers a way to use widely-available features natively in the modern build, while falling back to the legacy build in browsers with native ESM but without those features supported (e.g. Legacy Edge). This feature works by injecting a runtime check and loading the legacy bundle with SystemJs runtime if needed. There are the following drawbacks:
@@ -193,7 +195,7 @@ The current values are:
 
 - `sha256-MS6/3FCg4WjP9gwgaBGwLpRCY6fZBgwmhVCdrPrNf3E=`
 - `sha256-tQjf8gvb2ROOMapIxFvFAYBeUJ0v1HCbOcSmDNXGtDo=`
-- `sha256-VA8O2hAdooB288EpSTrGLl7z3QikbWU9wwoebO/QaYk=`
+- `sha256-ZxAi3a7m9Mzbc+Z1LGuCCK5Xee6reDkEPRas66H9KSo=`
 - `sha256-+5XkZFazzJo8n0iOP4ti/cLCMUudTf//Mzkb7xNPXIc=`
 
 <!--
