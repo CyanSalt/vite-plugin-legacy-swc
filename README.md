@@ -54,7 +54,7 @@ export default {
 - **Type:** `string | string[] | { [key: string]: string }`
 - **Default:** [`'last 2 versions and not dead, > 0.3%, Firefox ESR'`](https://browsersl.ist/#q=last+2+versions+and+not+dead%2C+%3E+0.3%25%2C+Firefox+ESR)
 
-  If explicitly set, it's passed on to [`@swc/core`](https://swc.rs/docs/configuration/supported-browsers#targets) when rendering **legacy chunks**.
+  It's passed on to [`@swc/core`](https://swc.rs/docs/configuration/supported-browsers#targets) when rendering **legacy chunks**.
 
   The query is also [Browserslist compatible](https://github.com/browserslist/browserslist). See [Browserslist Best Practices](https://github.com/browserslist/browserslist#best-practices) for more details.
 
@@ -65,11 +65,13 @@ export default {
 - **Type:** `string | string[]`
 - **Default:** [`'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'`](https://browsersl.ist/#q=edge%3E%3D79%2C+firefox%3E%3D67%2C+chrome%3E%3D64%2C+safari%3E%3D12%2C+chromeAndroid%3E%3D64%2C+iOS%3E%3D12)
 
-  If explicitly set, it's passed on to [`@swc/core`](https://swc.rs/docs/configuration/supported-browsers#targets) when rendering **modern chunks**.
+  It's passed on to [`@swc/core`](https://swc.rs/docs/configuration/supported-browsers#targets) when collecting polyfills for **modern chunks**. The value set here will override the `build.target` option.
 
   The query is also [Browserslist compatible](https://github.com/browserslist/browserslist). See [Browserslist Best Practices](https://github.com/browserslist/browserslist#best-practices) for more details.
 
   If it's not set, plugin-legacy-swc will fallback to the default value.
+
+  Note that this options should not be set unless `renderLegacyChunks` is set to `false`.
 
 ### `polyfills`
 
