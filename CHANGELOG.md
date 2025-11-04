@@ -1,5 +1,11 @@
 
 
+## [2.0.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v2.0.0...v2.0.1) (2025-11-04)
+
+### Bug Fixes
+
+* `modernTargets` should set `build.target` ([c0dd049](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/c0dd049aa6123657a31437a1394b7032739c99e3))
+
 ## [2.0.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v1.2.3...v2.0.0) (2025-07-23)
 
 ### ⚠ BREAKING CHANGES
