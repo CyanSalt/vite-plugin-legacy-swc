@@ -60,6 +60,9 @@ export default {
 
   If it's not set, plugin-legacy-swc will load [the browserslist config sources](https://github.com/browserslist/browserslist#queries) and then fallback to the default value.
 
+> [!NOTE]
+> Some browserslist queries are not supported in `targets` and `modernTargets` since SWC uses [`browserslist-rs`](https://github.com/browserslist/browserslist-rs). See [Limitations](https://github.com/browserslist/browserslist-rs?tab=readme-ov-file#limitations).
+
 ### `modernTargets`
 
 - **Type:** `string | string[]`
