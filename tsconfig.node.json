@@ -1,0 +1,11 @@
+{
+  "extends": "@cyansalt/tsconfig",
+  "compilerOptions": {
+    "composite": true
+  },
+  "include": [
+    "tests",
+    "**/*.config.js",
+    "**/*.config.ts"
+  ]
+}

@@ -5,7 +5,11 @@ export default config({
     {
       languageOptions: {
         parserOptions: {
-          project: './tsconfig.tools.json',
+          project: [
+            './playground/tsconfig.json',
+            './tsconfig.lib.json',
+            './tsconfig.node.json',
+          ],
         },
       },
     },

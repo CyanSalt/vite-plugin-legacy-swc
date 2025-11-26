@@ -1,0 +1,9 @@
+{
+  "extends": "@cyansalt/tsconfig",
+  "compilerOptions": {
+    "composite": true
+  },
+  "include": [
+    "src"
+  ]
+}

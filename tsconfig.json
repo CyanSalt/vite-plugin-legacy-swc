@@ -1,13 +1,8 @@
 {
-  "extends": "@cyansalt/tsconfig/tsconfig.lib",
-  "compilerOptions": {
-    "noEmit": false,
-    "declaration": true,
-    "rootDir": "src",
-    "outDir": "dist",
-    "module": "ES2022"
-  },
-  "include": [
-    "src"
+  "files": [],
+  "references": [
+    { "path": "./playground/tsconfig.json" },
+    { "path": "./tsconfig.lib.json" },
+    { "path": "./tsconfig.node.json" }
   ]
 }
