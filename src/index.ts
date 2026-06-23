@@ -6,7 +6,6 @@ import type {
   EnvConfig,
   JsMinifyOptions,
   Statement,
-  Options as SwcOptions,
   Plugin as SwcPlugin,
 } from '@swc/core'
 import browserslist from 'browserslist'
@@ -30,6 +29,13 @@ import {
   systemJSInlineCode,
 } from './snippets'
 import type { Options } from './types'
+
+// `EmittedPrebuiltChunk` fields `name`, `facadeModuleId`, `isEntry`,
+// `isDynamicEntry` are accepted by Rolldown (Vite 8) and newer Rollup at runtime
+// but absent from Vite 7's rollup.d.ts. We cast the emitFile payload below to
+// avoid a `declare module 'rollup'` augmentation — that augmentation can't
+// type-check on both Vite 7 (rollup types present) and Vite 8 (rolldown types
+// re-exported, no `rollup` module) simultaneously.
 
 // lazy load swc since it's not used during dev
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -155,6 +161,12 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let targets: Options['targets']
   const modernTargets: Options['modernTargets']
     = options.modernTargets || modernTargetsSwc
+
+  // Resolved in configResolved from the host's config (not this plugin's own
+  // node_modules). Vite 8 (Rolldown) can't emit SystemJS, so the legacy pipeline
+  // needs an ESM→SystemJS SWC pass there; Vite 7 (Rollup) emits SystemJS directly
+  // (format: 'system') and skips that pass.
+  let isRolldownBundler = false
 
   const genLegacy = options.renderLegacyChunks !== false
   const genModern = options.renderModernChunks !== false
@@ -301,7 +313,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     name: 'vite:legacy-generate-polyfill-chunk',
     apply: 'build',
 
-    async generateBundle(opts, bundle) {
+    async generateBundle(this: Rollup.PluginContext, opts, bundle) {
       if (resolvedConfig.build.ssr) {
         return
       }
@@ -329,6 +341,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           )
         }
         await buildPolyfillChunk({
+          ctx: this,
           mode: resolvedConfig.mode,
           imports: modernPolyfills,
           bundle,
@@ -372,6 +385,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         }
 
         await buildPolyfillChunk({
+          ctx: this,
           mode: resolvedConfig.mode,
           imports: legacyPolyfills,
           bundle,
@@ -403,8 +417,17 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       }
       resolvedConfig = config
 
+      // `rolldownOptions` only exists on Vite 8's ResolvedBuildOptions. Checking
+      // it via `in` reads the host's resolved config, so this works regardless of
+      // which `vite` the plugin's own node_modules resolves to.
+      isRolldownBundler = 'rolldownOptions' in config.build
+
       if (isDebug) {
         console.log(`[vite-plugin-legacy-swc] modernTargets:`, modernTargets)
+        console.log(
+          `[vite-plugin-legacy-swc] bundler:`,
+          isRolldownBundler ? 'rolldown' : 'rollup',
+        )
       }
 
       if (!genLegacy || resolvedConfig.build.ssr) {
@@ -456,9 +479,16 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       const createLegacyOutput = (
         outputOptions: Rollup.OutputOptions = {},
       ): Rollup.OutputOptions => {
+        // `format: 'system'` is valid on Rollup (Vite 7) but not on Rolldown
+        // (Vite 8) — Rolldown can't emit SystemJS, so we emit ESM and let SWC
+        // convert it. The `as unknown as` double cast works on both Vite
+        // versions: the `unknown` step is always non-trivial so
+        // `no-unnecessary-type-assertion` never fires.
+        const format
+          = (isRolldownBundler ? 'esm' : 'system') as unknown as Rollup.OutputOptions['format']
         return {
           ...outputOptions,
-          format: 'system',
+          format,
           entryFileNames: getLegacyOutputFileName(outputOptions.entryFileNames),
           chunkFileNames: getLegacyOutputFileName(outputOptions.chunkFileNames),
         }
@@ -574,14 +604,6 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       // transform the legacy chunk with @swc/core
       const sourceMaps = Boolean(resolvedConfig.build.sourcemap)
       const swc = await loadSwc()
-      const swcOptions: SwcOptions = {
-        swcrc: false,
-        configFile: false,
-        sourceMaps,
-        env: createSwcEnvOptions(targets, {
-          needPolyfills,
-        }),
-      }
       const minifyOptions: JsMinifyOptions = {
         compress: {
           // Different defaults between terser and swc
@@ -596,33 +618,64 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         module: opts.format.startsWith('es'),
         toplevel: opts.format === 'cjs',
       }
-      const transformResult = await swc.transform(raw, {
-        ...swcOptions,
-        inputSourceMap: undefined,
-        minify: Boolean(resolvedConfig.build.minify && minifyOptions.mangle),
-        jsc: {
-          assumptions,
-          // mangle only
-          minify: {
-            ...minifyOptions,
-            compress: false,
-          },
-          transform: {
-            optimizer: {
-              globals: {
-                vars: { [legacyEnvVarMarker]: 'true', [modernEnvVarMarker]: 'false' },
-              },
+
+      // On Rolldown the legacy output is ESM (Rolldown can't emit SystemJS), so Pass 1
+      // converts ESM → SystemJS and Pass 2 injects polyfills. On Rollup the legacy
+      // output is already SystemJS (format: 'system'), so a single pass does both.
+      const minifyMangle = Boolean(resolvedConfig.build.minify && minifyOptions.mangle)
+      const mangleOnlyJsc = {
+        assumptions,
+        minify: { ...minifyOptions, compress: false },
+        transform: {
+          optimizer: {
+            globals: {
+              vars: { [legacyEnvVarMarker]: 'true', [modernEnvVarMarker]: 'false' },
             },
           },
         },
-      })
+      }
+
+      let transformResult: { code: string, map?: string }
+
+      if (isRolldownBundler) {
+        const systemResult = await swc.transform(raw, {
+          swcrc: false,
+          configFile: false,
+          sourceMaps,
+          module: { type: 'systemjs' },
+          inputSourceMap: false,
+          minify: minifyMangle,
+          jsc: mangleOnlyJsc,
+        })
+        transformResult = await swc.transform(systemResult.code, {
+          swcrc: false,
+          configFile: false,
+          sourceMaps,
+          inputSourceMap: systemResult.map,
+          env: createSwcEnvOptions(targets, { needPolyfills }),
+        })
+      } else {
+        transformResult = await swc.transform(raw, {
+          swcrc: false,
+          configFile: false,
+          sourceMaps,
+          env: createSwcEnvOptions(targets, { needPolyfills }),
+          inputSourceMap: false,
+          minify: minifyMangle,
+          jsc: mangleOnlyJsc,
+        })
+      }
+
+      // collect and remove polyfill imports, then wrap in IIFE
       const plugin = swc.plugins([
         recordAndRemovePolyfillSwcPlugin(polyfillsDiscovered.legacy),
         wrapIIFESwcPlugin(),
       ])
       const ast = await swc.parse(transformResult.code)
       const result = await swc.print(plugin(ast), {
-        ...swcOptions,
+        swcrc: false,
+        configFile: false,
+        sourceMaps,
         inputSourceMap: transformResult.map,
         minify: Boolean(resolvedConfig.build.minify && minifyOptions.compress),
         jsc: {
@@ -839,6 +892,7 @@ function createSwcEnvOptions(
 const polyfillId = '\0vite/legacy-polyfills'
 
 async function buildPolyfillChunk({
+  ctx,
   mode,
   imports,
   bundle,
@@ -849,6 +903,7 @@ async function buildPolyfillChunk({
   excludeSystemJS,
   prependModernChunkLegacyGuard,
 }: {
+  ctx: Rollup.PluginContext,
   mode: string,
   imports: Set<string>,
   bundle: Rollup.OutputBundle,
@@ -906,6 +961,9 @@ async function buildPolyfillChunk({
     (chunk) => chunk.type === 'chunk' && chunk.isEntry,
   ) as Rollup.OutputChunk
 
+  let finalCode = polyfillChunk.code
+  let finalMap = polyfillChunk.map ?? undefined
+
   if (minify) {
     const swc = await loadSwc()
     const sourceMaps = Boolean(sourcemap)
@@ -925,14 +983,16 @@ async function buildPolyfillChunk({
       swcrc: false,
       configFile: false,
       sourceMaps,
-      inputSourceMap: polyfillChunk.map ? polyfillChunk.map.toString() : undefined,
+      inputSourceMap: polyfillChunk.map ? polyfillChunk.map.toString() : false,
       minify: true,
       jsc: {
         // mangle only
         minify: minifyOptions,
       },
     })
-    Object.assign(polyfillChunk, minifyResult)
+    finalCode = minifyResult.code
+    // swc returns map as a string; rollup expects a SourceMap object
+    finalMap = minifyResult.map ? JSON.parse(minifyResult.map) : undefined
   }
 
   // associate the polyfill chunk to every entry chunk so that we can retrieve
@@ -944,8 +1004,25 @@ async function buildPolyfillChunk({
     }
   }
 
-  // add the chunk to the bundle
-  bundle[polyfillChunk.fileName] = polyfillChunk
+  // add the chunk to the bundle using emitFile for Rolldown compatibility.
+  // The extra prebuilt-chunk fields (`name`, `facadeModuleId`, `isEntry`,
+  // `isDynamicEntry`) are accepted by Rolldown (Vite 8) and newer Rollup at
+  // runtime but absent from Vite 7's rollup.d.ts. The `as unknown as` double
+  // cast silences the excess-property check on Vite 7 without triggering
+  // `no-unnecessary-type-assertion` on Vite 8 (the `unknown` step is always
+  // non-trivial).
+  ctx.emitFile({
+    type: 'prebuilt-chunk',
+    name: polyfillChunk.name,
+    fileName: polyfillChunk.fileName,
+    code: finalCode,
+    facadeModuleId: polyfillChunk.facadeModuleId ?? undefined,
+    isEntry: polyfillChunk.isEntry,
+    isDynamicEntry: polyfillChunk.isDynamicEntry,
+    exports: [],
+    map: finalMap,
+    sourcemapFileName: polyfillChunk.sourcemapFileName ?? undefined,
+  } as unknown as Rollup.EmittedFile)
   if (polyfillChunk.sourcemapFileName) {
     const polyfillChunkMapAsset = rollupOutput.output.find(
       (chunk) =>
@@ -953,7 +1030,11 @@ async function buildPolyfillChunk({
         && chunk.fileName === polyfillChunk.sourcemapFileName,
     ) as Rollup.OutputAsset | undefined
     if (polyfillChunkMapAsset) {
-      bundle[polyfillChunk.sourcemapFileName] = polyfillChunkMapAsset
+      ctx.emitFile({
+        type: 'asset',
+        fileName: polyfillChunkMapAsset.fileName,
+        source: polyfillChunkMapAsset.source,
+      })
     }
   }
 
@@ -1008,22 +1089,18 @@ function isLegacyChunk(
   chunk: Rollup.RenderedChunk,
   options: Rollup.NormalizedOutputOptions,
 ) {
-  return options.format === 'system' && chunk.fileName.includes('-legacy')
+  return chunk.fileName.includes('-legacy')
 }
 
 function isLegacyBundle(
   bundle: Rollup.OutputBundle,
   options: Rollup.NormalizedOutputOptions,
 ) {
-  if (options.format === 'system') {
-    const entryChunk = Object.values(bundle).find(
-      (output) => output.type === 'chunk' && output.isEntry,
-    )
+  const entryChunk = Object.values(bundle).find(
+    (output) => output.type === 'chunk' && output.isEntry,
+  )
 
-    return Boolean(entryChunk?.fileName.includes('-legacy'))
-  }
-
-  return false
+  return entryChunk?.fileName.includes('-legacy') ?? false
 }
 
 function recordAndRemovePolyfillSwcPlugin(
