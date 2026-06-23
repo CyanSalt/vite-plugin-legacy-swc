@@ -2,5 +2,8 @@
   "name": "@vite-plugin-legacy-swc-playground/rollup-vite",
   "private": true,
   "version": "0.0.0",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "vite": "^7.3.5"
+  }
 }

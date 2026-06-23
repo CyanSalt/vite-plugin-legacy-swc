@@ -58,8 +58,8 @@
     ]
   },
   "dependencies": {
-    "@swc/core": "^1.15.33",
-    "browserslist": "^4.28.2",
+    "@swc/core": "^1.15.41",
+    "browserslist": "^4.28.4",
     "browserslist-to-esbuild": "^2.1.1",
     "core-js": "^3.49.0",
     "magic-string": "^0.30.21",
@@ -69,18 +69,18 @@
   "devDependencies": {
     "@cyansalt/eslint-config": "^4.6.0",
     "@cyansalt/tsconfig": "^3.0.2",
-    "@release-it/conventional-changelog": "^11.0.0",
-    "@types/node": "^24.12.3",
-    "acorn": "^8.16.0",
-    "eslint": "^10.3.0",
+    "@release-it/conventional-changelog": "^11.0.1",
+    "@types/node": "^24.13.2",
+    "acorn": "^8.17.0",
+    "eslint": "^10.5.0",
     "picocolors": "^1.1.1",
-    "release-it": "^20.0.1",
-    "rollup": "^4.60.3",
-    "terser": "^5.47.1",
-    "tsdown": "^0.22.0",
+    "release-it": "^20.2.0",
+    "rollup": "^4.62.2",
+    "terser": "^5.48.0",
+    "tsdown": "^0.22.3",
     "typescript": "^5.9.3",
-    "vite": "^7.3.3",
-    "vitest": "^4.1.5"
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
   },
   "peerDependencies": {
     "vite": ">=4.0.0"
