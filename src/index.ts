@@ -141,6 +141,8 @@ const $require = createRequire(import.meta.url)
 
 const nonLeadingHashInFileNameRE = /[^/]+\[hash(?::\d+)?\]/
 const prefixedHashInFileNameRE = /\W?\[hash(?::\d+)?\]/
+export const modulePreloadLinkRE
+  = /<link(?![\w-])[^>]*?\srel=(['"])modulepreload\1[^>]*>/g
 
 // browsers supporting ESM + dynamic import + import.meta + async generator
 const modernTargetsEsbuild = [
@@ -155,6 +157,9 @@ const modernTargetsEsbuild = [
 // https://github.com/evanw/esbuild/issues/121#issuecomment-646956379
 const modernTargetsSwc
   = 'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'
+
+const outputOptionsForLegacyChunks
+  = new WeakSet<Rollup.NormalizedOutputOptions>()
 
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let resolvedConfig: ResolvedConfig
@@ -183,6 +188,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   const assumptions = options.assumptions ?? {}
 
   const facadeToLegacyChunkMap = new Map()
+  const facadeToLegacyImportMap = new Map<string | null, Rollup.OutputAsset>()
   const facadeToLegacyPolyfillMap = new Map()
   const facadeToModernPolyfillMap = new Map()
   const modernPolyfills = new Set<string>()
@@ -259,9 +265,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
         if (options.modernTargets) {
           // Package is ESM only
-          const { default: browserslistToEsbuild } = await import(
-            'browserslist-to-esbuild'
-          )
+          const { default: browserslistToEsbuild }
+            = await import('browserslist-to-esbuild')
           config.build.target = browserslistToEsbuild(options.modernTargets)
         } else {
           config.build.target = modernTargetsEsbuild
@@ -313,7 +318,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     name: 'vite:legacy-generate-polyfill-chunk',
     apply: 'build',
 
-    async generateBundle(this: Rollup.PluginContext, opts, bundle) {
+    async generateBundle(opts, bundle) {
       if (resolvedConfig.build.ssr) {
         return
       }
@@ -326,7 +331,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
-      if (!isLegacyBundle(bundle, opts)) {
+      if (!isLegacyBundle(bundle)) {
         // Merge discovered modern polyfills to `modernPolyfills`
         for (const { modern } of chunkFileNameToPolyfills.values()) {
           modern.forEach((p) => modernPolyfills.add(p))
@@ -351,6 +356,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           rollupOutputOptions: opts,
           excludeSystemJS: true,
           prependModernChunkLegacyGuard: genLegacy,
+          isRolldownBundler,
         })
         return
       }
@@ -396,6 +402,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           format: 'iife',
           rollupOutputOptions: opts,
           excludeSystemJS: options.externalSystemJS,
+          isRolldownBundler,
         })
       }
     },
@@ -494,18 +501,38 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         }
       }
 
-      const { rollupOptions } = resolvedConfig.build
-      const { output } = rollupOptions
-      if (Array.isArray(output)) {
-        rollupOptions.output = [
-          ...output.map(createLegacyOutput),
-          ...(genModern ? output : []),
-        ]
+      if (isRolldownBundler) {
+        const { rolldownOptions } = config.build
+        const { output } = rolldownOptions
+        if (Array.isArray(output)) {
+          rolldownOptions.output = [
+            ...output.map(createLegacyOutput),
+            ...(genModern ? output : []),
+          ]
+        } else {
+          rolldownOptions.output = [
+            createLegacyOutput(output),
+            ...(genModern ? [output ?? {}] : []),
+          ]
+        }
+        // @ts-expect-error is readonly but should be injected here
+        resolvedConfig.isOutputOptionsForLegacyChunks = (
+          opts: Rollup.NormalizedOutputOptions,
+        ): boolean => outputOptionsForLegacyChunks.has(opts)
       } else {
-        rollupOptions.output = [
-          createLegacyOutput(output),
-          ...(genModern ? [output ?? {}] : []),
-        ]
+        const { rollupOptions } = resolvedConfig.build
+        const { output } = rollupOptions
+        if (Array.isArray(output)) {
+          rollupOptions.output = [
+            ...output.map(createLegacyOutput),
+            ...(genModern ? output : []),
+          ]
+        } else {
+          rollupOptions.output = [
+            createLegacyOutput(output),
+            ...(genModern ? [output ?? {}] : []),
+          ]
+        }
       }
     },
 
@@ -533,7 +560,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
-      if (!isLegacyChunk(chunk, opts)) {
+      if (!isLegacyChunk(chunk)) {
         if (
           options.modernPolyfills
           && !Array.isArray(options.modernPolyfills)
@@ -582,20 +609,24 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return null
       }
 
-      // @ts-expect-error avoid esbuild transform on legacy chunks since it produces
-      // legacy-unsafe code - e.g. rewriting object properties into shorthands
-      opts.__vite_skip_esbuild__ = true
+      if (isRolldownBundler) {
+        outputOptionsForLegacyChunks.add(opts)
+      } else {
+        // @ts-expect-error avoid esbuild transform on legacy chunks since it produces
+        // legacy-unsafe code - e.g. rewriting object properties into shorthands
+        opts.__vite_skip_esbuild__ = true
 
-      // @ts-expect-error force terser for legacy chunks. This only takes effect if
-      // minification isn't disabled, because that leaves out the terser plugin
-      // entirely.
-      opts.__vite_force_terser__ = true
+        // @ts-expect-error force terser for legacy chunks. This only takes effect if
+        // minification isn't disabled, because that leaves out the terser plugin
+        // entirely.
+        opts.__vite_force_terser__ = true
 
-      // @ts-expect-error In the `generateBundle` hook,
-      // we'll delete the assets from the legacy bundle to avoid emitting duplicate assets.
-      // But that's still a waste of computing resource.
-      // So we add this flag to avoid emitting the asset in the first place whenever possible.
-      opts.__vite_skip_asset_emit__ = true
+        // @ts-expect-error In the `generateBundle` hook,
+        // we'll delete the assets from the legacy bundle to avoid emitting duplicate assets.
+        // But that's still a waste of computing resource.
+        // So we add this flag to avoid emitting the asset in the first place whenever possible.
+        opts.__vite_skip_asset_emit__ = true
+      }
 
       // avoid emitting assets for legacy bundle
       const needPolyfills
@@ -690,19 +721,27 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       return result
     },
 
-    transformIndexHtml(html, { chunk }) {
+    transformIndexHtml(html, { chunk, bundle }) {
       if (resolvedConfig.build.ssr) return
       if (!chunk) return
       if (chunk.fileName.includes('-legacy')) {
         // The legacy bundle is built first, and its index.html isn't actually emitted if
         // modern bundle will be generated. Here we simply record its corresponding legacy chunk.
         facadeToLegacyChunkMap.set(chunk.facadeModuleId, chunk.fileName)
+        if (resolvedConfig.build.chunkImportMap) {
+          facadeToLegacyImportMap.set(
+            chunk.facadeModuleId,
+            bundle![getImportMapFilename(resolvedConfig)] as Rollup.OutputAsset,
+          )
+        }
         if (genModern) {
           return
         }
       }
       if (!genModern) {
-        html = html.replace(/<script type="module".*?<\/script>/g, '')
+        html = html
+          .replace(/<script type="module".*?<\/script>/g, '')
+          .replace(modulePreloadLinkRE, '')
       }
 
       const tags: HtmlTagDescriptor[] = []
@@ -738,7 +777,22 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return { html, tags }
       }
 
-      // 2. inject Safari 10 nomodule fix
+      // 2. inject importmaps
+      if (resolvedConfig.build.chunkImportMap) {
+        const importMap = facadeToLegacyImportMap.get(chunk.facadeModuleId)!
+        const decoder = new TextDecoder()
+        tags.push({
+          tag: 'script',
+          attrs: { type: 'systemjs-importmap' },
+          children:
+            typeof importMap.source === 'string'
+              ? importMap.source
+              : decoder.decode(importMap.source),
+          injectTo: 'head',
+        })
+      }
+
+      // 3. inject Safari 10 nomodule fix
       if (genModern) {
         tags.push({
           tag: 'script',
@@ -748,7 +802,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         })
       }
 
-      // 3. inject legacy polyfills
+      // 4. inject legacy polyfills
       const legacyPolyfillFilename = facadeToLegacyPolyfillMap.get(
         chunk.facadeModuleId,
       )
@@ -773,7 +827,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
-      // 4. inject legacy entry
+      // 5. inject legacy entry
       const legacyEntryFilename = facadeToLegacyChunkMap.get(
         chunk.facadeModuleId,
       )
@@ -803,7 +857,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
-      // 5. inject dynamic import fallback entry
+      // 6. inject dynamic import fallback entry
       if (legacyPolyfillFilename && legacyEntryFilename && genModern) {
         tags.push({
           tag: 'script',
@@ -830,10 +884,16 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return
       }
 
-      if (isLegacyBundle(bundle, opts) && genModern) {
+      if (isLegacyBundle(bundle) && genModern) {
+        const importMapFilename = getImportMapFilename(resolvedConfig)
         // avoid emitting duplicate assets
         for (const name of Object.keys(bundle)) {
-          if (bundle[name].type === 'asset' && !name.endsWith('.map')) {
+          if (
+            bundle[name].type === 'asset'
+            && !name.endsWith('.map')
+            && !name.includes('-legacy') // legacy chunks
+            && name !== importMapFilename // handled by import analysis build plugin
+          ) {
             delete bundle[name]
           }
         }
@@ -842,6 +902,15 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   }
 
   return [legacyConfigPlugin, legacyGenerateBundlePlugin, legacyPostPlugin]
+}
+
+function getImportMapFilename(config: ResolvedConfig): string {
+  const chunkImportMap
+    = config.build.rolldownOptions.experimental?.chunkImportMap
+  if (typeof chunkImportMap === 'object' && chunkImportMap.fileName) {
+    return chunkImportMap.fileName
+  }
+  return 'importmap.json'
 }
 
 export async function detectPolyfills(
@@ -902,6 +971,7 @@ async function buildPolyfillChunk({
   rollupOutputOptions,
   excludeSystemJS,
   prependModernChunkLegacyGuard,
+  isRolldownBundler,
 }: {
   ctx: Rollup.PluginContext,
   mode: string,
@@ -913,6 +983,7 @@ async function buildPolyfillChunk({
   rollupOutputOptions: Rollup.NormalizedOutputOptions,
   excludeSystemJS?: boolean,
   prependModernChunkLegacyGuard?: boolean,
+  isRolldownBundler?: boolean,
 }) {
   let { minify, assetsDir, terserOptions, sourcemap } = buildOptions
   const res = await build({
@@ -930,7 +1001,7 @@ async function buildPolyfillChunk({
       minify: false,
       assetsDir,
       sourcemap,
-      rollupOptions: {
+      [isRolldownBundler ? 'rolldownOptions' : 'rollupOptions']: {
         input: {
           polyfills: polyfillId,
         },
@@ -1022,7 +1093,7 @@ async function buildPolyfillChunk({
     exports: [],
     map: finalMap,
     sourcemapFileName: polyfillChunk.sourcemapFileName ?? undefined,
-  } as unknown as Rollup.EmittedFile)
+  })
   if (polyfillChunk.sourcemapFileName) {
     const polyfillChunkMapAsset = rollupOutput.output.find(
       (chunk) =>
@@ -1037,8 +1108,6 @@ async function buildPolyfillChunk({
       })
     }
   }
-
-  return polyfillChunk
 }
 
 function polyfillsPlugin(
@@ -1088,22 +1157,16 @@ function prependModernChunkLegacyGuardPlugin(): Plugin {
   }
 }
 
-function isLegacyChunk(
-  chunk: Rollup.RenderedChunk,
-  options: Rollup.NormalizedOutputOptions,
-) {
+function isLegacyChunk(chunk: Rollup.RenderedChunk) {
   return chunk.fileName.includes('-legacy')
 }
 
-function isLegacyBundle(
-  bundle: Rollup.OutputBundle,
-  options: Rollup.NormalizedOutputOptions,
-) {
+function isLegacyBundle(bundle: Rollup.OutputBundle) {
   const entryChunk = Object.values(bundle).find(
     (output) => output.type === 'chunk' && output.isEntry,
   )
 
-  return entryChunk?.fileName.includes('-legacy') ?? false
+  return Boolean(entryChunk?.fileName.includes('-legacy'))
 }
 
 function recordAndRemovePolyfillSwcPlugin(
