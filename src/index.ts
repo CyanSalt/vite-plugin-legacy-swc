@@ -20,11 +20,11 @@ import type {
 } from 'vite'
 import { build, normalizePath } from 'vite'
 import {
+  createModernChunkLegacyGuard,
   detectModernBrowserCode,
   dynamicFallbackInlineCode,
   legacyEntryId,
   legacyPolyfillId,
-  modernChunkLegacyGuard,
   safari10NoModuleFix,
   systemJSInlineCode,
 } from './snippets'
@@ -552,7 +552,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
         if (genLegacy && chunk.isEntry) {
           // append this code to avoid modern chunks running on legacy targeted browsers
-          ms.prepend(modernChunkLegacyGuard)
+          ms.prepend(createModernChunkLegacyGuard(chunk.fileName))
         }
 
         if (raw.includes(legacyEnvVarMarker)) {
@@ -1070,7 +1070,10 @@ function prependModernChunkLegacyGuardPlugin(): Plugin {
     configResolved(config) {
       sourceMapEnabled = Boolean(config.build.sourcemap)
     },
-    renderChunk(code) {
+    renderChunk(code, chunk) {
+      const modernChunkLegacyGuard = createModernChunkLegacyGuard(
+        chunk.fileName,
+      )
       if (!sourceMapEnabled) {
         return modernChunkLegacyGuard + code
       }
