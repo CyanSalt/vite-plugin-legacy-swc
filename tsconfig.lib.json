@@ -1,7 +1,8 @@
 {
   "extends": "@cyansalt/tsconfig",
   "compilerOptions": {
-    "composite": true
+    "composite": true,
+    "noEmit": false
   },
   "include": [
     "src"
