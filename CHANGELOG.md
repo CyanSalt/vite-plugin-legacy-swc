@@ -1,4 +1,18 @@
+# Changelog
 
+## [2.1.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v2.0.2...v2.1.0) (2026-06-23)
+
+### Features
+
+* gate ESM→SystemJS SWC conversion on Rolldown (Vite 8+) ([5f85c2e](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/5f85c2e34390a0f1f50b88e433ca67240db06fce))
+* support Rolldown (Vite 8) by using ESM output + SWC SystemJS conversion ([7baf539](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/7baf539b670f2ea280a837f9463215396d47aec7))
+* sync plugin-legacy logics for rolldown bundler ([ce9dd8e](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/ce9dd8e923ef3f64f2bb87637f58fa420cbfed07))
+* update snippets ([98338e9](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/98338e9074c6115d2fcf57897ae6fa4c87c4d5fd))
+
+### Bug Fixes
+
+* chain sourcemap through SWC two-pass transform and parse polyfill chunk map ([4f59d08](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/4f59d08d237d102320f5f05b32fbc1088eb7ae31))
+* resolve lint errors in isLegacyChunk/isLegacyBundle and polyfill chunk loop ([9a32ad2](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/9a32ad221a7e07e3f4376025ed575fc973ca3057))
 
 ## [2.0.2](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v2.0.1...v2.0.2) (2026-05-07)
 
