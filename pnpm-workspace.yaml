@@ -1,3 +1,6 @@
+packages:
+  - 'playground/*'
+
 allowBuilds:
   # Prepare binary or other required files
   '@swc/core': true

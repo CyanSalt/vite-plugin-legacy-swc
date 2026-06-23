@@ -1,0 +1,9 @@
+{
+  "name": "@vite-plugin-legacy-swc-playground/rolldown-vite",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "devDependencies": {
+    "vite": "^8.1.0"
+  }
+}

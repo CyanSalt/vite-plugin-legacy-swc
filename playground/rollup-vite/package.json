@@ -1,5 +1,5 @@
 {
-  "name": "vite-plugin-legacy-swc-playground",
+  "name": "@vite-plugin-legacy-swc-playground/rollup-vite",
   "private": true,
   "version": "0.0.0",
   "type": "module"

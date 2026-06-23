@@ -1,7 +1,7 @@
 {
   "files": [],
   "references": [
-    { "path": "./playground/tsconfig.json" },
+    { "path": "./playground/rollup-vite/tsconfig.json" },
     { "path": "./tsconfig.lib.json" },
     { "path": "./tsconfig.node.json" }
   ]
