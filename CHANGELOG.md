@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.1](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v2.1.0...v2.1.1) (2026-06-24)
+
+### Bug Fixes
+
+* dist extension ([98a95a5](https://github.com/CyanSalt/vite-plugin-legacy-swc/commit/98a95a53c0ddcefb2489e26a7406ac374702ab80))
+
 ## [2.1.0](https://github.com/CyanSalt/vite-plugin-legacy-swc/compare/v2.0.2...v2.1.0) (2026-06-23)
 
 ### Features
