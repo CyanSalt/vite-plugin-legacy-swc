@@ -906,7 +906,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
 function getImportMapFilename(config: ResolvedConfig): string {
   const chunkImportMap
-    = config.build.rolldownOptions.experimental?.chunkImportMap
+    = 'rolldownOptions' in config.build
+      ? config.build.rolldownOptions.experimental?.chunkImportMap
+      : undefined
   if (typeof chunkImportMap === 'object' && chunkImportMap.fileName) {
     return chunkImportMap.fileName
   }
