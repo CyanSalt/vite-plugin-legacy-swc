@@ -135,7 +135,7 @@ function toAssetPathFromHtml(
 }
 
 const legacyEnvVarMarker = `__VITE_IS_LEGACY__`
-const modernEnvVarMarker = `__VITE_IS_MODERN__`
+const modernEnvVarMarker = `__VITE_LEGACY_SWC_IS_MODERN__`
 
 const $require = createRequire(import.meta.url)
 
@@ -536,6 +536,20 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       }
     },
 
+    transform(code, id) {
+      if (!genLegacy || resolvedConfig.build.ssr) return
+      const ms = new MagicString(code)
+      if (id === '\0vite/modulepreload-polyfill.js') {
+        ms.prepend(`if (${modernEnvVarMarker}) {\n`)
+        ms.append('\n}')
+      } else if (id === '\0vite/preload-helper.js') {
+        ms.replaceAll('__VITE_IS_MODERN__', modernEnvVarMarker)
+      } else {
+        return
+      }
+      return { code: ms.toString(), map: ms.generateMap({ hires: 'boundary' }) }
+    },
+
     async renderChunk(raw, chunk, opts, { chunks }) {
       if (resolvedConfig.build.ssr) {
         return null
@@ -582,15 +596,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           ms.prepend(createModernChunkLegacyGuard(chunk.fileName))
         }
 
-        if (raw.includes(legacyEnvVarMarker)) {
-          const re = new RegExp(legacyEnvVarMarker, 'g')
+        for (const [marker, value] of [[legacyEnvVarMarker, 'false'], [modernEnvVarMarker, 'true']]) {
+          const re = new RegExp(marker, 'g')
           let match
           while ((match = re.exec(raw))) {
-            ms.overwrite(
-              match.index,
-              match.index + legacyEnvVarMarker.length,
-              `false`,
-            )
+            ms.overwrite(match.index, match.index + marker.length, value)
           }
         }
 
