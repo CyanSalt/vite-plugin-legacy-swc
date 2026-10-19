@@ -158,9 +158,6 @@ const modernTargetsEsbuild = [
 const modernTargetsSwc
   = 'edge>=79, firefox>=67, chrome>=64, safari>=12, chromeAndroid>=64, iOS>=12'
 
-const outputOptionsForLegacyChunks
-  = new WeakSet<Rollup.NormalizedOutputOptions>()
-
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let resolvedConfig: ResolvedConfig
   let targets: Options['targets']
@@ -186,6 +183,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     = debugFlags.includes('vite:*') || debugFlags.includes('vite:legacy')
 
   const assumptions = options.assumptions ?? {}
+  const outputOptionsForLegacyChunks = new WeakSet<Rollup.NormalizedOutputOptions>()
+  const legacyChunkFileNames = new Set<string>()
 
   const facadeToLegacyChunkMap = new Map()
   const facadeToLegacyImportMap = new Map<string | null, Rollup.OutputAsset>()
@@ -331,7 +330,15 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
-      if (!isLegacyBundle(bundle)) {
+      const isLegacyOutput = outputOptionsForLegacyChunks.has(opts)
+      if (isLegacyOutput) {
+        for (const chunk of Object.values(bundle)) {
+          if (chunk.type === 'chunk') {
+            legacyChunkFileNames.add(chunk.fileName)
+          }
+        }
+      }
+      if (!isLegacyOutput) {
         // Merge discovered modern polyfills to `modernPolyfills`
         for (const { modern } of chunkFileNameToPolyfills.values()) {
           modern.forEach((p) => modernPolyfills.add(p))
@@ -423,6 +430,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         throw new Error('vite-plugin-legacy-swc does not support library mode.')
       }
       resolvedConfig = config
+      legacyChunkFileNames.clear()
 
       // `rolldownOptions` only exists on Vite 8's ResolvedBuildOptions. Checking
       // it via `in` reads the host's resolved config, so this works regardless of
@@ -496,6 +504,15 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return {
           ...outputOptions,
           format,
+          plugins: [
+            ...[outputOptions.plugins].flat(),
+            {
+              name: 'vite:legacy-output',
+              renderStart(opts) {
+                outputOptionsForLegacyChunks.add(opts)
+              },
+            },
+          ],
           entryFileNames: getLegacyOutputFileName(outputOptions.entryFileNames),
           chunkFileNames: getLegacyOutputFileName(outputOptions.chunkFileNames),
         }
@@ -560,7 +577,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
-      if (!isLegacyChunk(chunk)) {
+      if (!outputOptionsForLegacyChunks.has(opts)) {
         if (
           options.modernPolyfills
           && !Array.isArray(options.modernPolyfills)
@@ -724,7 +741,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     transformIndexHtml(html, { chunk, bundle }) {
       if (resolvedConfig.build.ssr) return
       if (!chunk) return
-      if (chunk.fileName.includes('-legacy')) {
+      if (legacyChunkFileNames.has(chunk.fileName)) {
         // The legacy bundle is built first, and its index.html isn't actually emitted if
         // modern bundle will be generated. Here we simply record its corresponding legacy chunk.
         facadeToLegacyChunkMap.set(chunk.facadeModuleId, chunk.fileName)
@@ -884,14 +901,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return
       }
 
-      if (isLegacyBundle(bundle) && genModern) {
+      if (outputOptionsForLegacyChunks.has(opts) && genModern) {
         const importMapFilename = getImportMapFilename(resolvedConfig)
         // avoid emitting duplicate assets
         for (const name of Object.keys(bundle)) {
           if (
             bundle[name].type === 'asset'
             && !name.endsWith('.map')
-            && !name.includes('-legacy') // legacy chunks
             && name !== importMapFilename // handled by import analysis build plugin
           ) {
             delete bundle[name]
@@ -1155,18 +1171,6 @@ function prependModernChunkLegacyGuardPlugin(): Plugin {
       }
     },
   }
-}
-
-function isLegacyChunk(chunk: Rollup.RenderedChunk) {
-  return chunk.fileName.includes('-legacy')
-}
-
-function isLegacyBundle(bundle: Rollup.OutputBundle) {
-  const entryChunk = Object.values(bundle).find(
-    (output) => output.type === 'chunk' && output.isEntry,
-  )
-
-  return Boolean(entryChunk?.fileName.includes('-legacy'))
 }
 
 function recordAndRemovePolyfillSwcPlugin(
