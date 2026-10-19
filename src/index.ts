@@ -162,16 +162,17 @@ const outputOptionsForLegacyChunks
   = new WeakSet<Rollup.NormalizedOutputOptions>()
 
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
-  let resolvedConfig: ResolvedConfig
-  let targets: Options['targets']
+  let applicationConfig: ResolvedConfig
+  const getTargets = (config: ResolvedConfig): Options['targets'] =>
+    options.targets
+    || browserslistLoadConfig({ path: config.root })
+    || 'last 2 versions and not dead, > 0.3%, Firefox ESR'
+  const getEnvironmentConfig = (context: unknown): ResolvedConfig => {
+    const environment = (context as { environment?: { config: ResolvedConfig } } | undefined)?.environment
+    return environment?.config ?? applicationConfig
+  }
   const modernTargets: Options['modernTargets']
     = options.modernTargets || modernTargetsSwc
-
-  // Resolved in configResolved from the host's config (not this plugin's own
-  // node_modules). Vite 8 (Rolldown) can't emit SystemJS, so the legacy pipeline
-  // needs an ESM→SystemJS SWC pass there; Vite 7 (Rollup) emits SystemJS directly
-  // (format: 'system') and skips that pass.
-  let isRolldownBundler = false
 
   const genLegacy = options.renderLegacyChunks !== false
   const genModern = options.renderModernChunks !== false
@@ -319,6 +320,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     apply: 'build',
 
     async generateBundle(opts, bundle) {
+      const resolvedConfig = getEnvironmentConfig(this)
+      const isRolldownBundler = 'rolldownOptions' in resolvedConfig.build
+      const targets = getTargets(resolvedConfig)
       if (resolvedConfig.build.ssr) {
         return
       }
@@ -422,12 +426,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       if (config.build.lib) {
         throw new Error('vite-plugin-legacy-swc does not support library mode.')
       }
-      resolvedConfig = config
+      applicationConfig = config
+      const resolvedConfig = config
 
       // `rolldownOptions` only exists on Vite 8's ResolvedBuildOptions. Checking
       // it via `in` reads the host's resolved config, so this works regardless of
       // which `vite` the plugin's own node_modules resolves to.
-      isRolldownBundler = 'rolldownOptions' in config.build
+      const isRolldownBundler = 'rolldownOptions' in config.build
 
       if (isDebug) {
         console.log(`[vite-plugin-legacy-swc] modernTargets:`, modernTargets)
@@ -441,10 +446,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return
       }
 
-      targets
-        = options.targets
-        || browserslistLoadConfig({ path: resolvedConfig.root })
-        || 'last 2 versions and not dead, > 0.3%, Firefox ESR'
+      const targets = getTargets(config)
       if (isDebug) {
         console.log(`[vite-plugin-legacy-swc] targets:`, targets)
       }
@@ -457,7 +459,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         defaultFileName = '[name]-legacy-[hash].js',
       ): string | ((chunkInfo: Rollup.PreRenderedChunk) => string) => {
         if (!fileNames) {
-          return path.posix.join(resolvedConfig.build.assetsDir, defaultFileName)
+          return path.posix.join(config.build.assetsDir, defaultFileName)
         }
 
         return (chunkInfo) => {
@@ -537,6 +539,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     },
 
     async renderChunk(raw, chunk, opts, { chunks }) {
+      const resolvedConfig = getEnvironmentConfig(this)
+      const isRolldownBundler = 'rolldownOptions' in resolvedConfig.build
+      const targets = getTargets(resolvedConfig)
       if (resolvedConfig.build.ssr) {
         return null
       }
@@ -722,6 +727,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     },
 
     transformIndexHtml(html, { chunk, bundle }) {
+      const resolvedConfig = getEnvironmentConfig(this)
       if (resolvedConfig.build.ssr) return
       if (!chunk) return
       if (chunk.fileName.includes('-legacy')) {
@@ -880,6 +886,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     },
 
     generateBundle(opts, bundle) {
+      const resolvedConfig = getEnvironmentConfig(this)
       if (resolvedConfig.build.ssr) {
         return
       }
