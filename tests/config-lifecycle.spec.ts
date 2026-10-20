@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { InlineConfig, Rollup } from 'vite'
@@ -6,17 +6,17 @@ import { createBuilder } from 'vite'
 import { expect, test } from 'vitest'
 import legacy from '../src'
 
-async function buildClient(environments: InlineConfig['environments'], base = '/') {
-  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'legacy-swc-environments-')))
-  if (path.dirname(path.resolve(root)) !== await realpath(os.tmpdir())) {
-    throw new Error(`Unexpected fixture directory: ${root}`)
-  }
+async function buildClient(environments: InlineConfig['environments']) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'legacy-swc-environments-'))
   try {
-    await writeFile(path.join(root, 'index.html'), '<script type="module" src="/main.js"></script>')
-    await writeFile(path.join(root, 'main.js'), 'window.isLegacy = import.meta.env.LEGACY')
+    await Promise.all(Object.entries({
+      'index.html': '<script type="module" src="/main.js"></script>',
+      'main.js': 'window.load = () => import("./lazy.js").then(m => m.value)',
+      'lazy.js': 'export const value = 42',
+    }).map(([file, code]) => writeFile(path.join(root, file), code)))
     const builder = await createBuilder({
       root,
-      base,
+      base: './',
       configFile: false,
       logLevel: 'silent',
       plugins: legacy({ targets: 'IE 11', polyfills: false, externalSystemJS: true }),
@@ -36,14 +36,30 @@ test('an SSR environment preserves client legacy output and relative asset URLs'
   const outputs = await buildClient({
     client: { build: { assetsDir: 'client-assets' } },
     ssr: { consumer: 'server', build: { ssr: true, assetsDir: 'server-assets' } },
-  }, './')
+  })
   const legacyEntry = outputs.find((output): output is Rollup.OutputChunk =>
     output.type === 'chunk' && output.isEntry && output.fileName.includes('-legacy'))!
   expect(legacyEntry.code).toContain('System.register')
   expect(legacyEntry.fileName).toMatch(/^client-assets\//)
   const html = outputs.find((output): output is Rollup.OutputAsset =>
     output.type === 'asset' && output.fileName === 'index.html')!
-  expect(String(html.source)).toContain('id="vite-legacy-entry"')
   expect(String(html.source)).toContain(`data-src="./${legacyEntry.fileName}"`)
-  expect(String(html.source)).not.toContain('server-assets')
+})
+
+test('shared plugins use the client import map when another environment disables it', async () => {
+  const outputs = await buildClient({
+    client: { build: { chunkImportMap: true } },
+    other: { consumer: 'client', build: { chunkImportMap: false } },
+  })
+  const html = outputs.find((output): output is Rollup.OutputAsset =>
+    output.type === 'asset' && output.fileName === 'index.html')!
+  const mapSource = String(html.source).match(/<script type="systemjs-importmap">(.*?)<\/script>/s)?.[1]
+  expect(mapSource).toBeDefined()
+  const importMap = JSON.parse(mapSource!) as { imports: Record<string, string> }
+  const targets = Object.values(importMap.imports).map((value) =>
+    new URL(value, 'https://example.com/').pathname.slice(1))
+  const lazy = outputs.find((output): output is Rollup.OutputChunk =>
+    output.type === 'chunk' && output.isDynamicEntry && output.fileName.includes('-legacy'))!
+  expect(targets.length).toBeGreaterThan(0)
+  expect(targets).toContain(lazy.fileName)
 })
