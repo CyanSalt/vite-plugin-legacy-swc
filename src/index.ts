@@ -175,6 +175,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
   const genLegacy = options.renderLegacyChunks !== false
   const genModern = options.renderModernChunks !== false
+  let isSsrBuild = false
   if (!genLegacy && !genModern) {
     throw new Error(
       '`renderLegacyChunks` and `renderModernChunks` cannot be both false',
@@ -419,6 +420,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     },
 
     configResolved(config) {
+      isSsrBuild = Boolean(config.build.ssr)
       if (config.build.lib) {
         throw new Error('vite-plugin-legacy-swc does not support library mode.')
       }
@@ -537,7 +539,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     },
 
     transform(code, id) {
-      if (!genLegacy || resolvedConfig.build.ssr) return
+      const environment = (this as { environment?: { config: ResolvedConfig } }).environment
+      if (!genLegacy || (environment?.config.build.ssr ?? isSsrBuild)) return
       const ms = new MagicString(code)
       if (id === '\0vite/modulepreload-polyfill.js') {
         ms.prepend(`if (${modernEnvVarMarker}) {\n`)
