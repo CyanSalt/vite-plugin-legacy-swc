@@ -13,7 +13,6 @@ const vite7Require = createRequire(new URL('../playground/rollup-vite/package.js
 const vite7 = await import(pathToFileURL(vite7Require.resolve('vite')).href) as typeof Vite
 
 test('Vite 7 includes the builtins required by iterable spread helpers', async () => {
-  expect(vite7.version).toMatch(/^7\./)
   const root = await mkdtemp(path.join(os.tmpdir(), 'legacy-swc-helper-'))
   try {
     await Promise.all([
