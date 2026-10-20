@@ -47,6 +47,8 @@ export default {
 }
 ```
 
+Legacy chunks use SWC for compression when `build.minify` is enabled, with the existing SWC-compatible `build.terserOptions`. Set `build.minify: false` to disable compression. Modern chunks follow Vite's selected minifier; selecting a different compressor for legacy output is outside this change.
+
 ## Options
 
 ### `targets`

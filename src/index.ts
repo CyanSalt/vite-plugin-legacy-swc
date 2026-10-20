@@ -441,6 +441,18 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return
       }
 
+      // SWC owns legacy compression; Vite's legacy Terser fallback must not run again.
+      const terserPlugin = config.plugins.find((plugin) => plugin.name === 'vite:terser')
+      const hook = terserPlugin?.renderChunk
+      if (terserPlugin && hook) {
+        const renderChunk = typeof hook === 'function' ? hook : hook.handler
+        const handler: typeof renderChunk = function (...args) {
+          if (outputOptionsForLegacyChunks.has(args[2])) return null
+          return renderChunk.apply(this, args)
+        }
+        terserPlugin.renderChunk = typeof hook === 'function' ? handler : { ...hook, handler }
+      }
+
       targets
         = options.targets
         || browserslistLoadConfig({ path: resolvedConfig.root })
@@ -496,6 +508,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return {
           ...outputOptions,
           format,
+          ...(isRolldownBundler ? { minify: false } : {}),
           entryFileNames: getLegacyOutputFileName(outputOptions.entryFileNames),
           chunkFileNames: getLegacyOutputFileName(outputOptions.chunkFileNames),
         }
@@ -609,17 +622,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return null
       }
 
-      if (isRolldownBundler) {
-        outputOptionsForLegacyChunks.add(opts)
-      } else {
+      outputOptionsForLegacyChunks.add(opts)
+      if (!isRolldownBundler) {
         // @ts-expect-error avoid esbuild transform on legacy chunks since it produces
         // legacy-unsafe code - e.g. rewriting object properties into shorthands
         opts.__vite_skip_esbuild__ = true
-
-        // @ts-expect-error force terser for legacy chunks. This only takes effect if
-        // minification isn't disabled, because that leaves out the terser plugin
-        // entirely.
-        opts.__vite_force_terser__ = true
 
         // @ts-expect-error In the `generateBundle` hook,
         // we'll delete the assets from the legacy bundle to avoid emitting duplicate assets.
@@ -633,8 +640,12 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         = options.polyfills !== false && !Array.isArray(options.polyfills)
 
       // transform the legacy chunk with @swc/core
-      const sourceMaps = Boolean(resolvedConfig.build.sourcemap)
+      const environment = (this as { environment?: { config: ResolvedConfig } }).environment
+      const buildOptions = environment?.config.build ?? resolvedConfig.build
+      const sourceMaps = Boolean(buildOptions.sourcemap)
       const swc = await loadSwc()
+      const terserOptions = { ...buildOptions.terserOptions }
+      delete terserOptions.maxWorkers
       const minifyOptions: JsMinifyOptions = {
         compress: {
           // Different defaults between terser and swc
@@ -644,7 +655,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         },
         mangle: true,
         safari10: true,
-        ...resolvedConfig.build.terserOptions as JsMinifyOptions,
+        ...terserOptions as JsMinifyOptions,
         sourceMap: Boolean(opts.sourcemap),
         module: opts.format.startsWith('es'),
         toplevel: opts.format === 'cjs',
@@ -652,10 +663,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
       // Lower both outputs before usage detection so that dependencies introduced
       // by SWC helpers are included. Rolldown also needs ESM → SystemJS conversion.
-      const minifyMangle = Boolean(resolvedConfig.build.minify && minifyOptions.mangle)
-      const mangleOnlyJsc = {
+      const legacyJsc = {
         assumptions,
-        minify: { ...minifyOptions, compress: false },
         transform: {
           optimizer: {
             globals: {
@@ -675,8 +684,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           module: { type: 'systemjs' },
           env: createSwcEnvOptions(targets, { needPolyfills: false }),
           inputSourceMap: false,
-          minify: minifyMangle,
-          jsc: mangleOnlyJsc,
+          jsc: legacyJsc,
         })
       } else {
         transformResult = await swc.transform(raw, {
@@ -685,8 +693,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           sourceMaps,
           env: createSwcEnvOptions(targets, { needPolyfills: false }),
           inputSourceMap: false,
-          minify: minifyMangle,
-          jsc: mangleOnlyJsc,
+          jsc: legacyJsc,
         })
       }
 
@@ -711,17 +718,19 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         configFile: false,
         sourceMaps,
         inputSourceMap: transformResult.map,
-        minify: Boolean(resolvedConfig.build.minify && minifyOptions.compress),
-        jsc: {
-          // compress only
-          minify: {
-            ...minifyOptions,
-            mangle: false,
-          },
-        },
       })
+      if (!buildOptions.minify) return result
 
-      return result
+      // Reparse the wrapped code before compression to avoid mixing AST syntax contexts.
+      return swc.transform(result.code, {
+        swcrc: false,
+        configFile: false,
+        sourceMaps,
+        inputSourceMap: result.map,
+        minify: true,
+        env: createSwcEnvOptions(targets, { needPolyfills: false }),
+        jsc: { minify: minifyOptions },
+      })
     },
 
     transformIndexHtml(html, { chunk, bundle }) {
