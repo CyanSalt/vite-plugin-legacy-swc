@@ -1,15 +1,11 @@
-import { createRequire } from 'node:module'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 import { expect, test } from 'vitest'
 
 test('rollup-vite playground should work', async () => {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../playground/rollup-vite')
-  const require = createRequire(path.join(root, 'package.json'))
-  const { build: buildWithRollup } = await import(pathToFileURL(require.resolve('vite')).href) as { build: typeof build }
-  const res = await buildWithRollup({
-    root,
+  const res = await build({
+    root: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../playground/rollup-vite'),
   })
   expect(res).toBeTruthy()
 })
