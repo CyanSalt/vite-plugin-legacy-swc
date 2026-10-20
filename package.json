@@ -70,6 +70,7 @@
     "@cyansalt/eslint-config": "^4.6.0",
     "@cyansalt/tsconfig": "^3.0.2",
     "@release-it/conventional-changelog": "^11.0.1",
+    "@rollup/plugin-virtual": "^3.0.2",
     "@types/node": "^24.13.2",
     "acorn": "^8.17.0",
     "eslint": "^10.5.0",
