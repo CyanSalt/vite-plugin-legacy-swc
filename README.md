@@ -47,7 +47,11 @@ export default {
 }
 ```
 
-Legacy chunks use SWC for compression when `build.minify` is enabled, with the existing SWC-compatible `build.terserOptions`. Set `build.minify: false` to disable compression. Modern chunks follow Vite's selected minifier; selecting a different compressor for legacy output is outside this change.
+Legacy chunks use SWC for compression by default and with `build.minify: true`, using the existing SWC-compatible `build.terserOptions`. Explicit `build.minify: 'oxc'` uses Vite's public Oxc minifier before SWC lowers the result for legacy browsers; its options come from `build.rolldownOptions.output.minify`. Set `build.minify: false` to disable compression.
+
+On Vite 8, the plugin records each environment's requested minifier in its `configEnvironment` hook before Vite normalizes `true` and `'oxc'` to the same value. No Vite patch is required. Vite 7 keeps its existing SWC path. Modern chunks continue to follow Vite's selected minifier.
+
+If another plugin uses both `enforce: 'post'` and `configEnvironment: { order: 'post' }`, place `legacy()` after that plugin. Ambiguous ordering produces an error naming the plugins to move; no other plugin's configuration hooks are modified. Choose the compressor before `configResolved`; a final `build.minify: false` still disables compression. Explicit Oxc output options `minify: false` and `'dce-only'` skip the manual compression pass rather than enabling full compression.
 
 ## Options
 
