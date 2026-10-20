@@ -36,10 +36,9 @@ test.each([undefined, true, false, 'oxc'] as const)('legacy compression stays ES
         Object.freeze({
           name: 'configure-compression',
           enforce: 'post' as const,
-          config: { order: 'post' as const, handler: () => ({ environments: { client: { build: { cssTarget: 'chrome61' } } } }) },
           configEnvironment: {
             order: 'post' as const,
-            async handler() {
+            handler() {
               return { build: { minify } }
             },
           },
@@ -48,7 +47,6 @@ test.each([undefined, true, false, 'oxc'] as const)('legacy compression stays ES
       ],
       build: {
         write: false,
-        minify: minify === undefined ? undefined : minify === 'oxc' ? true : 'oxc',
         sourcemap: minify === 'oxc',
         modulePreload: false,
         terserOptions: { compress: { drop_console: minify !== 'oxc' } },
