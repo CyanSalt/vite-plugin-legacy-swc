@@ -650,10 +650,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         toplevel: opts.format === 'cjs',
       }
 
-      // On Rolldown the legacy output is ESM (Rolldown can't emit SystemJS), so Pass 1
-      // converts ESM → SystemJS and Pass 2 injects polyfills. On Rollup the legacy
-      // output is already SystemJS, but still needs lowering before usage
-      // detection so that dependencies introduced by SWC helpers are included.
+      // Lower both outputs before usage detection so that dependencies introduced
+      // by SWC helpers are included. Rolldown also needs ESM → SystemJS conversion.
       const minifyMangle = Boolean(resolvedConfig.build.minify && minifyOptions.mangle)
       const mangleOnlyJsc = {
         assumptions,
@@ -670,21 +668,15 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       let transformResult: { code: string, map?: string }
 
       if (isRolldownBundler) {
-        const systemResult = await swc.transform(raw, {
+        transformResult = await swc.transform(raw, {
           swcrc: false,
           configFile: false,
           sourceMaps,
           module: { type: 'systemjs' },
+          env: createSwcEnvOptions(targets, { needPolyfills: false }),
           inputSourceMap: false,
           minify: minifyMangle,
           jsc: mangleOnlyJsc,
-        })
-        transformResult = await swc.transform(systemResult.code, {
-          swcrc: false,
-          configFile: false,
-          sourceMaps,
-          inputSourceMap: systemResult.map,
-          env: createSwcEnvOptions(targets, { needPolyfills }),
         })
       } else {
         transformResult = await swc.transform(raw, {
@@ -696,15 +688,16 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           minify: minifyMangle,
           jsc: mangleOnlyJsc,
         })
-        if (needPolyfills) {
-          transformResult = await swc.transform(transformResult.code, {
-            swcrc: false,
-            configFile: false,
-            sourceMaps,
-            inputSourceMap: transformResult.map,
-            env: createSwcEnvOptions(targets, { needPolyfills }),
-          })
-        }
+      }
+
+      if (needPolyfills) {
+        transformResult = await swc.transform(transformResult.code, {
+          swcrc: false,
+          configFile: false,
+          sourceMaps,
+          inputSourceMap: transformResult.map,
+          env: createSwcEnvOptions(targets, { needPolyfills }),
+        })
       }
 
       // collect and remove polyfill imports, then wrap in IIFE

@@ -4,21 +4,30 @@ import { createContext, runInContext } from 'node:vm'
 import virtual from '@rollup/plugin-virtual'
 import type * as Vite from 'vite'
 import type { Rollup } from 'vite'
+import { build } from 'vite'
 import { expect, test } from 'vitest'
 import legacy from '../src'
 
 const vite7Require = createRequire(new URL('../playground/rollup-vite/package.json', import.meta.url))
 const vite7 = await import(pathToFileURL(vite7Require.resolve('vite')).href) as typeof Vite
 
-test('Vite 7 includes the builtins required by iterable spread helpers', async () => {
-  const result = await vite7.build({
+test.each([
+  ['Rollup', vite7.build],
+  ['Rolldown', build],
+] as const)('%s includes the builtins required by iterable spread helpers', async (bundler, buildWithBundler) => {
+  const result = await buildWithBundler({
     configFile: false,
     logLevel: 'silent',
     plugins: [
       virtual({ entry: 'window.run = value => [...value]' }),
       legacy({ targets: 'IE 11', renderModernChunks: false }),
     ],
-    build: { write: false, minify: false, modulePreload: false, rollupOptions: { input: 'entry' } },
+    build: {
+      write: false,
+      minify: false,
+      modulePreload: false,
+      [bundler === 'Rollup' ? 'rollupOptions' : 'rolldownOptions']: { input: 'entry' },
+    },
   })
   const chunks = (Array.isArray(result) ? result : [result])
     .flatMap((output) => ('output' in output ? output.output : []))
