@@ -1,21 +1,15 @@
-import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
 import { createContext, runInContext } from 'node:vm'
 import virtual from '@rollup/plugin-virtual'
+import { build as buildWithRollup } from 'rollup-vite'
 import type * as Vite from 'vite'
 import type { Rollup } from 'vite'
-import { build } from 'vite'
 import { expect, test } from 'vitest'
-import legacy from '../src'
+import legacy from '../../src'
 
-const vite7Require = createRequire(new URL('../playground/rollup-vite/package.json', import.meta.url))
-const vite7 = await import(pathToFileURL(vite7Require.resolve('vite')).href) as typeof Vite
+const build = buildWithRollup as unknown as (options: any) => ReturnType<typeof Vite.build>
 
-test.each([
-  ['Rollup', vite7.build],
-  ['Rolldown', build],
-] as const)('%s includes the builtins required by iterable spread helpers', async (bundler, buildWithBundler) => {
-  const result = await buildWithBundler({
+test('includes the builtins required by iterable spread helpers', async () => {
+  const result = await build({
     configFile: false,
     logLevel: 'silent',
     plugins: [
@@ -26,14 +20,14 @@ test.each([
       write: false,
       minify: false,
       modulePreload: false,
-      [bundler === 'Rollup' ? 'rollupOptions' : 'rolldownOptions']: { input: 'entry' },
+      rollupOptions: { input: 'entry' },
     },
   })
   const chunks = (Array.isArray(result) ? result : [result])
-    .flatMap((output) => ('output' in output ? output.output : []))
+    .flatMap(output => ('output' in output ? output.output : []))
     .filter((chunk): chunk is Rollup.OutputChunk => chunk.type === 'chunk')
-  const polyfill = chunks.find((chunk) => chunk.fileName.includes('polyfills-legacy'))!
-  const entry = chunks.find((chunk) => chunk.isEntry && chunk !== polyfill)!
+  const polyfill = chunks.find(chunk => chunk.fileName.includes('polyfills-legacy'))!
+  const entry = chunks.find(chunk => chunk.isEntry && chunk !== polyfill)!
   const context = createContext({ console, setTimeout, clearTimeout })
   runInContext(`
     this.window = this; this.self = this;
