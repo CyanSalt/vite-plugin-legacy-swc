@@ -955,6 +955,17 @@ function createSwcEnvOptions(
       ? $require('core-js/package.json').version
       : undefined,
     shippedProposals: true,
+    // These obsolete proposal modules forcefully replace the standard Set
+    // methods. Keep SWC's corresponding stable es.set.*.v2 polyfills instead.
+    exclude: [
+      'esnext.set.difference',
+      'esnext.set.intersection',
+      'esnext.set.is-disjoint-from',
+      'esnext.set.is-subset-of',
+      'esnext.set.is-superset-of',
+      'esnext.set.symmetric-difference',
+      'esnext.set.union',
+    ],
   }
 }
 
