@@ -971,6 +971,28 @@ function createSwcEnvOptions(
   }
 }
 
+function minifyPlugin(minifyOptions: JsMinifyOptions): Plugin {
+  const sourceMaps = Boolean(minifyOptions.sourceMap)
+  return {
+    name: 'vite:legacy-swc-polyfill-transform',
+    async renderChunk(code) {
+      const swc = await loadSwc()
+      // Let the bundler hash the final code and chain its sourcemap.
+      return swc.transform(code, {
+        swcrc: false,
+        configFile: false,
+        sourceMaps,
+        inputSourceMap: false,
+        minify: true,
+        jsc: {
+          target: 'esnext',
+          minify: minifyOptions,
+        },
+      })
+    },
+  }
+}
+
 const polyfillId = '\0vite/legacy-polyfills'
 
 async function buildPolyfillChunk({
@@ -998,7 +1020,20 @@ async function buildPolyfillChunk({
   prependModernChunkLegacyGuard?: boolean,
   isRolldownBundler?: boolean,
 }) {
-  let { minify, assetsDir, terserOptions, sourcemap } = buildOptions
+  const { minify, assetsDir, terserOptions, sourcemap } = buildOptions
+  const sourceMaps = Boolean(sourcemap)
+  const minifyOptions: JsMinifyOptions = {
+    compress: {
+      // Different defaults between terser and swc
+      dead_code: true,
+      keep_fargs: true,
+      passes: 1,
+    },
+    mangle: true,
+    safari10: true,
+    ...terserOptions as JsMinifyOptions,
+    sourceMap: sourceMaps,
+  }
   const res = await build({
     mode,
     // so that everything is resolved from here
@@ -1008,6 +1043,7 @@ async function buildPolyfillChunk({
     plugins: [
       polyfillsPlugin(imports, excludeSystemJS),
       prependModernChunkLegacyGuard && prependModernChunkLegacyGuardPlugin(),
+      minify && minifyPlugin(minifyOptions),
     ],
     build: {
       write: false,
@@ -1020,6 +1056,7 @@ async function buildPolyfillChunk({
         },
         output: {
           format,
+          ...(isRolldownBundler ? { minify: false } : {}),
           hashCharacters: rollupOutputOptions.hashCharacters,
           entryFileNames: rollupOutputOptions.entryFileNames,
           sourcemapBaseUrl: rollupOutputOptions.sourcemapBaseUrl,
@@ -1045,40 +1082,6 @@ async function buildPolyfillChunk({
     (chunk) => chunk.type === 'chunk' && chunk.isEntry,
   ) as Rollup.OutputChunk
 
-  let finalCode = polyfillChunk.code
-  let finalMap = polyfillChunk.map ?? undefined
-
-  if (minify) {
-    const swc = await loadSwc()
-    const sourceMaps = Boolean(sourcemap)
-    const minifyOptions: JsMinifyOptions = {
-      compress: {
-        // Different defaults between terser and swc
-        dead_code: true,
-        keep_fargs: true,
-        passes: 1,
-      },
-      mangle: true,
-      safari10: true,
-      ...terserOptions as JsMinifyOptions,
-      sourceMap: sourceMaps,
-    }
-    const minifyResult = await swc.transform(polyfillChunk.code, {
-      swcrc: false,
-      configFile: false,
-      sourceMaps,
-      inputSourceMap: polyfillChunk.map ? polyfillChunk.map.toString() : false,
-      minify: true,
-      jsc: {
-        // mangle only
-        minify: minifyOptions,
-      },
-    })
-    finalCode = minifyResult.code
-    // swc returns map as a string; rollup expects a SourceMap object
-    finalMap = minifyResult.map ? JSON.parse(minifyResult.map) : undefined
-  }
-
   // associate the polyfill chunk to every entry chunk so that we can retrieve
   // the polyfill filename in index html transform
   for (const key of Object.keys(bundle)) {
@@ -1099,12 +1102,12 @@ async function buildPolyfillChunk({
     type: 'prebuilt-chunk',
     name: polyfillChunk.name,
     fileName: polyfillChunk.fileName,
-    code: finalCode,
+    code: polyfillChunk.code,
     facadeModuleId: polyfillChunk.facadeModuleId ?? undefined,
     isEntry: polyfillChunk.isEntry,
     isDynamicEntry: polyfillChunk.isDynamicEntry,
     exports: [],
-    map: finalMap,
+    map: polyfillChunk.map ?? undefined,
     sourcemapFileName: polyfillChunk.sourcemapFileName ?? undefined,
   })
   if (polyfillChunk.sourcemapFileName) {
