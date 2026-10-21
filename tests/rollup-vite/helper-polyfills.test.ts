@@ -1,20 +1,17 @@
 import { createContext, runInContext } from 'node:vm'
 import virtual from '@rollup/plugin-virtual'
+import type { PluginOption, Rollup } from 'rollup-vite'
 import { build as buildWithRollup } from 'rollup-vite'
-import type * as Vite from 'vite'
-import type { Rollup } from 'vite'
 import { expect, test } from 'vitest'
 import legacy from '../../src'
 
-const build = buildWithRollup as unknown as (options: any) => ReturnType<typeof Vite.build>
-
 test('includes the builtins required by iterable spread helpers', async () => {
-  const result = await build({
+  const result = await buildWithRollup({
     configFile: false,
     logLevel: 'silent',
     plugins: [
       virtual({ entry: 'window.run = value => [...value]' }),
-      legacy({ targets: 'IE 11', renderModernChunks: false }),
+      legacy({ targets: 'IE 11', renderModernChunks: false }) as unknown as PluginOption,
     ],
     build: {
       write: false,
