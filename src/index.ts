@@ -958,6 +958,28 @@ function createSwcEnvOptions(
   }
 }
 
+function minifyPlugin(minifyOptions: JsMinifyOptions): Plugin {
+  const sourceMaps = Boolean(minifyOptions.sourceMap)
+  return {
+    name: 'vite:legacy-swc-polyfill-transform',
+    async renderChunk(code) {
+      const swc = await loadSwc()
+      // Let the bundler hash the final code and chain its sourcemap.
+      return swc.transform(code, {
+        swcrc: false,
+        configFile: false,
+        sourceMaps,
+        inputSourceMap: false,
+        minify: true,
+        jsc: {
+          target: 'esnext',
+          minify: minifyOptions,
+        },
+      })
+    },
+  }
+}
+
 const polyfillId = '\0vite/legacy-polyfills'
 
 async function buildPolyfillChunk({
@@ -986,6 +1008,19 @@ async function buildPolyfillChunk({
   isRolldownBundler?: boolean,
 }) {
   const { minify, assetsDir, terserOptions, sourcemap } = buildOptions
+  const sourceMaps = Boolean(sourcemap)
+  const minifyOptions: JsMinifyOptions = {
+    compress: {
+      // Different defaults between terser and swc
+      dead_code: true,
+      keep_fargs: true,
+      passes: 1,
+    },
+    mangle: true,
+    safari10: true,
+    ...terserOptions as JsMinifyOptions,
+    sourceMap: sourceMaps,
+  }
   const res = await build({
     mode,
     // so that everything is resolved from here
@@ -995,48 +1030,7 @@ async function buildPolyfillChunk({
     plugins: [
       polyfillsPlugin(imports, excludeSystemJS),
       prependModernChunkLegacyGuard && prependModernChunkLegacyGuardPlugin(),
-      {
-        name: 'vite:legacy-swc-polyfill-transform',
-        configResolved(config) {
-          if (!('rolldownOptions' in config.build)) return
-          for (const output of [config.build.rolldownOptions.output].flat()) {
-            if (output) {
-              output.minify = false
-            }
-          }
-        },
-        async renderChunk(code) {
-          if (!minify) return null
-
-          const swc = await loadSwc()
-          const sourceMaps = Boolean(sourcemap)
-          const minifyOptions: JsMinifyOptions = {
-            compress: {
-              // Different defaults between terser and swc
-              dead_code: true,
-              keep_fargs: true,
-              passes: 1,
-            },
-            mangle: true,
-            safari10: true,
-            ...terserOptions as JsMinifyOptions,
-            sourceMap: sourceMaps,
-          }
-          // Let the bundler hash the final code and chain its sourcemap.
-          return swc.transform(code, {
-            swcrc: false,
-            configFile: false,
-            sourceMaps,
-            inputSourceMap: false,
-            minify: true,
-            // Core-js's Symbol initialization depends on its own typeof checks.
-            env: format === 'iife'
-              ? { exclude: ['transform-typeof-symbol'] }
-              : undefined,
-            jsc: { minify: minifyOptions },
-          })
-        },
-      },
+      minify && minifyPlugin(minifyOptions),
     ],
     build: {
       write: false,
@@ -1049,6 +1043,7 @@ async function buildPolyfillChunk({
         },
         output: {
           format,
+          ...(isRolldownBundler ? { minify: false } : {}),
           hashCharacters: rollupOutputOptions.hashCharacters,
           entryFileNames: rollupOutputOptions.entryFileNames,
           sourcemapBaseUrl: rollupOutputOptions.sourcemapBaseUrl,
