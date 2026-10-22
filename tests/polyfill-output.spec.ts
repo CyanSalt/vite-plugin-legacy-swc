@@ -7,7 +7,7 @@ import legacy from '../src'
 
 test('legacy polyfill output is finalized before hashing and mapping', async () => {
   const builds: Rollup.OutputChunk[] = []
-  for (const minify of [false, true]) {
+  for (const minify of [false, true, 'oxc'] as const) {
     const result = await build({
       configFile: false,
       logLevel: 'silent',

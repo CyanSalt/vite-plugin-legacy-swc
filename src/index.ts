@@ -18,7 +18,7 @@ import type {
   ResolvedConfig,
   Rollup,
 } from 'vite'
-import { build, normalizePath } from 'vite'
+import * as vite from 'vite'
 import {
   createModernChunkLegacyGuard,
   detectModernBrowserCode,
@@ -29,6 +29,8 @@ import {
   systemJSInlineCode,
 } from './snippets'
 import type { Options } from './types'
+
+const { build, normalizePath } = vite
 
 // `EmittedPrebuiltChunk` fields `name`, `facadeModuleId`, `isEntry`,
 // `isDynamicEntry` are accepted by Rolldown (Vite 8) and newer Rollup at runtime
@@ -161,6 +163,26 @@ const modernTargetsSwc
 const outputOptionsForLegacyChunks
   = new WeakSet<Rollup.NormalizedOutputOptions>()
 
+async function minifyWithOxc(
+  code: string,
+  filename: string,
+  options: Rollup.OutputOptions['minify'],
+  sourcemap: boolean,
+  module: boolean,
+): Promise<{ code: string, map?: string }> {
+  if (options === false || options === 'dce-only') return { code }
+  // Namespace access preserves Vite 7's SWC path without its missing Oxc export.
+  const minify = (vite as Partial<typeof vite>).minify
+  if (!minify) throw new Error('vite-plugin-legacy-swc: explicit Oxc minification requires Vite\'s public minify API.')
+  const result = await minify(filename, code, {
+    ...(typeof options === 'object' ? options : {}),
+    sourcemap,
+    module,
+  })
+  if (result.errors.length) throw new Error(result.errors.map(error => error.message).join('\n'))
+  return { code: result.code, map: result.map ? JSON.stringify(result.map) : undefined }
+}
+
 function viteLegacyPlugin(options: Options = {}): Plugin[] {
   let resolvedConfig: ResolvedConfig
   let targets: Options['targets']
@@ -172,6 +194,10 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
   // needs an ESM→SystemJS SWC pass there; Vite 7 (Rollup) emits SystemJS directly
   // (format: 'system') and skips that pass.
   let isRolldownBundler = false
+  const originalMinifiers = new Map<string, BuildOptions['minify']>()
+  const usesOxc = (buildOptions: BuildOptions, name = 'client'): boolean =>
+    isRolldownBundler && buildOptions.minify === 'oxc' && originalMinifiers.get(name) === 'oxc'
+  const oxcOutputOptions = new WeakMap<Rollup.NormalizedOutputOptions, Rollup.OutputOptions['minify']>()
 
   const genLegacy = options.renderLegacyChunks !== false
   const genModern = options.renderModernChunks !== false
@@ -236,6 +262,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     name: 'vite:legacy-config',
 
     async config(config, env) {
+      originalMinifiers.clear()
       if (env.command === 'build' && !config.build?.ssr) {
         config.build ??= {}
 
@@ -319,6 +346,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     apply: 'build',
 
     async generateBundle(opts, bundle) {
+      const environment = (this as { environment?: { name?: string, config: ResolvedConfig } }).environment
+      const buildOptions = environment?.config.build ?? resolvedConfig.build
+      const useOxc = usesOxc(buildOptions, environment?.name)
       if (resolvedConfig.build.ssr) {
         return
       }
@@ -351,7 +381,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           imports: modernPolyfills,
           bundle,
           facadeToChunkMap: facadeToModernPolyfillMap,
-          buildOptions: resolvedConfig.build,
+          buildOptions,
+          useOxc,
+          oxcOptions: opts.minify,
           format: 'es',
           rollupOutputOptions: opts,
           excludeSystemJS: true,
@@ -396,9 +428,9 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
           imports: legacyPolyfills,
           bundle,
           facadeToChunkMap: facadeToLegacyPolyfillMap,
-          // force using swc for legacy polyfill minification, since esbuild
-          // isn't legacy-safe
-          buildOptions: resolvedConfig.build,
+          buildOptions,
+          useOxc,
+          oxcOptions: oxcOutputOptions.get(opts),
           format: 'iife',
           rollupOutputOptions: opts,
           excludeSystemJS: options.externalSystemJS,
@@ -412,6 +444,13 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
     name: 'vite:legacy-post-process',
     enforce: 'post',
     apply: 'build',
+
+    configEnvironment: {
+      order: 'post',
+      handler(name, config) {
+        originalMinifiers.set(name, config.build?.minify)
+      },
+    },
 
     renderStart(opts) {
       // Empty the nested map for this output
@@ -437,8 +476,34 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         )
       }
 
+      if (isRolldownBundler
+        && !config.build.ssr
+        && (genLegacy || (genModern && (options.modernPolyfills === true || modernPolyfills.size)))
+        && Object.values(config.environments).some(({ build: environmentBuild }) =>
+          !environmentBuild.ssr && environmentBuild.minify === 'oxc')) {
+        const plugins = config.getSortedPlugins('configEnvironment')
+        const laterPlugins = plugins
+          .slice(plugins.findIndex(plugin => plugin === legacyPostPlugin) + 1)
+          .filter(plugin => typeof plugin.configEnvironment === 'object' && plugin.configEnvironment.order === 'post')
+        if (laterPlugins.length) {
+          throw new Error(`vite-plugin-legacy-swc must capture minify after all post configEnvironment hooks. Move legacy() after ${laterPlugins.map(plugin => plugin.name).join(', ')} in plugins.`)
+        }
+      }
+
       if (!genLegacy || resolvedConfig.build.ssr) {
         return
+      }
+
+      // Legacy compression runs before the final SWC lowering pass.
+      const terserPlugin = config.plugins.find((plugin) => plugin.name === 'vite:terser')
+      const hook = terserPlugin?.renderChunk
+      if (terserPlugin && hook) {
+        const renderChunk = typeof hook === 'function' ? hook : hook.handler
+        const handler: typeof renderChunk = function (...args) {
+          if (outputOptionsForLegacyChunks.has(args[2])) return null
+          return renderChunk.apply(this, args)
+        }
+        terserPlugin.renderChunk = typeof hook === 'function' ? handler : { ...hook, handler }
       }
 
       targets
@@ -496,6 +561,18 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return {
           ...outputOptions,
           format,
+          ...(isRolldownBundler ? { minify: false } : {}),
+          ...(isRolldownBundler ? {
+            plugins: [
+              ...[outputOptions.plugins].flat(),
+              {
+                name: 'vite:legacy-oxc-options',
+                renderStart(opts) {
+                  oxcOutputOptions.set(opts, outputOptions.minify)
+                },
+              },
+            ],
+          } : {}),
           entryFileNames: getLegacyOutputFileName(outputOptions.entryFileNames),
           chunkFileNames: getLegacyOutputFileName(outputOptions.chunkFileNames),
         }
@@ -609,17 +686,11 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         return null
       }
 
-      if (isRolldownBundler) {
-        outputOptionsForLegacyChunks.add(opts)
-      } else {
+      outputOptionsForLegacyChunks.add(opts)
+      if (!isRolldownBundler) {
         // @ts-expect-error avoid esbuild transform on legacy chunks since it produces
         // legacy-unsafe code - e.g. rewriting object properties into shorthands
         opts.__vite_skip_esbuild__ = true
-
-        // @ts-expect-error force terser for legacy chunks. This only takes effect if
-        // minification isn't disabled, because that leaves out the terser plugin
-        // entirely.
-        opts.__vite_force_terser__ = true
 
         // @ts-expect-error In the `generateBundle` hook,
         // we'll delete the assets from the legacy bundle to avoid emitting duplicate assets.
@@ -633,8 +704,16 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         = options.polyfills !== false && !Array.isArray(options.polyfills)
 
       // transform the legacy chunk with @swc/core
-      const sourceMaps = Boolean(resolvedConfig.build.sourcemap)
+      const environment = (this as { environment?: { name?: string, config: ResolvedConfig } }).environment
+      const buildOptions = environment?.config.build ?? resolvedConfig.build
+      const sourceMaps = Boolean(buildOptions.sourcemap)
+      const useOxc = usesOxc(buildOptions, environment?.name)
+      const input = useOxc
+        ? await minifyWithOxc(raw, chunk.fileName, oxcOutputOptions.get(opts), sourceMaps, opts.format.startsWith('es'))
+        : { code: raw, map: undefined }
       const swc = await loadSwc()
+      const terserOptions = { ...buildOptions.terserOptions }
+      delete terserOptions.maxWorkers
       const minifyOptions: JsMinifyOptions = {
         compress: {
           // Different defaults between terser and swc
@@ -644,7 +723,7 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         },
         mangle: true,
         safari10: true,
-        ...resolvedConfig.build.terserOptions as JsMinifyOptions,
+        ...terserOptions as JsMinifyOptions,
         sourceMap: Boolean(opts.sourcemap),
         module: opts.format.startsWith('es'),
         toplevel: opts.format === 'cjs',
@@ -652,10 +731,8 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
 
       // Lower both outputs before usage detection so that dependencies introduced
       // by SWC helpers are included. Rolldown also needs ESM → SystemJS conversion.
-      const minifyMangle = Boolean(resolvedConfig.build.minify && minifyOptions.mangle)
-      const mangleOnlyJsc = {
+      const legacyJsc = {
         assumptions,
-        minify: { ...minifyOptions, compress: false },
         transform: {
           optimizer: {
             globals: {
@@ -668,25 +745,23 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
       let transformResult: { code: string, map?: string }
 
       if (isRolldownBundler) {
-        transformResult = await swc.transform(raw, {
+        transformResult = await swc.transform(input.code, {
           swcrc: false,
           configFile: false,
           sourceMaps,
           module: { type: 'systemjs' },
           env: createSwcEnvOptions(targets, { needPolyfills: false }),
-          inputSourceMap: false,
-          minify: minifyMangle,
-          jsc: mangleOnlyJsc,
+          inputSourceMap: input.map ?? false,
+          jsc: legacyJsc,
         })
       } else {
-        transformResult = await swc.transform(raw, {
+        transformResult = await swc.transform(input.code, {
           swcrc: false,
           configFile: false,
           sourceMaps,
           env: createSwcEnvOptions(targets, { needPolyfills: false }),
-          inputSourceMap: false,
-          minify: minifyMangle,
-          jsc: mangleOnlyJsc,
+          inputSourceMap: input.map ?? false,
+          jsc: legacyJsc,
         })
       }
 
@@ -706,22 +781,33 @@ function viteLegacyPlugin(options: Options = {}): Plugin[] {
         wrapIIFESwcPlugin(),
       ])
       const ast = await swc.parse(transformResult.code)
+      if (useOxc) {
+        return swc.transform(plugin(ast), {
+          swcrc: false,
+          configFile: false,
+          sourceMaps,
+          inputSourceMap: transformResult.map,
+          env: createSwcEnvOptions(targets, { needPolyfills: false }),
+        })
+      }
       const result = await swc.print(plugin(ast), {
         swcrc: false,
         configFile: false,
         sourceMaps,
         inputSourceMap: transformResult.map,
-        minify: Boolean(resolvedConfig.build.minify && minifyOptions.compress),
-        jsc: {
-          // compress only
-          minify: {
-            ...minifyOptions,
-            mangle: false,
-          },
-        },
       })
+      if (!buildOptions.minify) return result
 
-      return result
+      // Reparse the wrapped code before compression to avoid mixing AST syntax contexts.
+      return swc.transform(result.code, {
+        swcrc: false,
+        configFile: false,
+        sourceMaps,
+        inputSourceMap: result.map,
+        minify: true,
+        env: createSwcEnvOptions(targets, { needPolyfills: false }),
+        jsc: { minify: minifyOptions },
+      })
     },
 
     transformIndexHtml(html, { chunk, bundle }) {
@@ -974,22 +1060,30 @@ function createSwcEnvOptions(
   }
 }
 
-function minifyPlugin(minifyOptions: JsMinifyOptions): Plugin {
+function minifyPlugin(
+  minifyOptions: JsMinifyOptions,
+  useOxc: boolean,
+  oxcOptions: Rollup.OutputOptions['minify'],
+  format: 'iife' | 'es',
+): Plugin {
   const sourceMaps = Boolean(minifyOptions.sourceMap)
   return {
     name: 'vite:legacy-swc-polyfill-transform',
-    async renderChunk(code) {
+    async renderChunk(code, chunk) {
       const swc = await loadSwc()
+      const input = useOxc
+        ? await minifyWithOxc(code, chunk.fileName, oxcOptions, sourceMaps, format === 'es')
+        : { code, map: undefined }
       // Let the bundler hash the final code and chain its sourcemap.
-      return swc.transform(code, {
+      return swc.transform(input.code, {
         swcrc: false,
         configFile: false,
         sourceMaps,
-        inputSourceMap: false,
+        inputSourceMap: input.map ?? false,
         minify: true,
         jsc: {
           target: 'esnext',
-          minify: minifyOptions,
+          minify: useOxc ? undefined : minifyOptions,
         },
       })
     },
@@ -1005,6 +1099,8 @@ async function buildPolyfillChunk({
   bundle,
   facadeToChunkMap,
   buildOptions,
+  useOxc,
+  oxcOptions,
   format,
   rollupOutputOptions,
   excludeSystemJS,
@@ -1017,6 +1113,8 @@ async function buildPolyfillChunk({
   bundle: Rollup.OutputBundle,
   facadeToChunkMap: Map<string, string>,
   buildOptions: BuildOptions,
+  useOxc: boolean,
+  oxcOptions: Rollup.OutputOptions['minify'],
   format: 'iife' | 'es',
   rollupOutputOptions: Rollup.NormalizedOutputOptions,
   excludeSystemJS?: boolean,
@@ -1046,7 +1144,7 @@ async function buildPolyfillChunk({
     plugins: [
       polyfillsPlugin(imports, excludeSystemJS),
       prependModernChunkLegacyGuard && prependModernChunkLegacyGuardPlugin(),
-      minify && minifyPlugin(minifyOptions),
+      minify && minifyPlugin(minifyOptions, useOxc, oxcOptions, format),
     ],
     build: {
       write: false,
